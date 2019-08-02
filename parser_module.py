@@ -75,7 +75,7 @@ class twitchvodparser:
 		status, info = self.check_user()
 		client.login()
 		if status == 0:
-			for x in range(19, -1, -1):
+			for x in range(len(info['data'])-1, -1, -1):
 				memesquality = self.quality
 				m3u8check = False
 				time.sleep(1.5)
