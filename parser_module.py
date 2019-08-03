@@ -46,7 +46,7 @@ class twitchvodparser:
         status, info = self.check_user()
         client.login()
         try:
-            if sheet.findall(info['data'][0]['url']) == []:
+            if sheet.findall(info['data'][0]['url']) == [] or None:
                 self.loopcheck(mode=mode)
             else:
 			    if mode == 1:
