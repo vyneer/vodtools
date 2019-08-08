@@ -13,13 +13,14 @@ import subprocess
 import datetime
 import getopt
 import config
+import client_twitch_oauth
 
 class launcher:
     def __init__(self):
         # global configuration
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
         # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
-        self.oauth_token = config.twitch_oauth_token
+        self.oauth_token = client_twitch_oauth.token
         self.refresh = config.refresh_time
         
         # user configuration
@@ -31,11 +32,11 @@ class launcher:
     def run(self):
         # make sure the interval to check user availability is not less than 15 seconds
         if(self.refresh < 15):
-            print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+"Check interval should not be lower than 15 seconds.")
+            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Check interval should not be lower than 15 seconds.")
             self.refresh = 15
-            print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+"System set check interval to 15 seconds.")
+            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"System set check interval to 15 seconds.")
         
-        print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+"Checking for " + str(self.username) + " every " + str(self.refresh) + " seconds.")
+        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking for " + str(self.username) + " every " + str(self.refresh) + " seconds.")
         self.get_id()
         self.loopcheck()
 
@@ -70,35 +71,35 @@ class launcher:
             r.raise_for_status()
             info = r.json()
             if self.mode == 1:
-                print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
             self.vodchecker.userid = info["data"][0]["id"]
         except requests.exceptions.RequestException as e:
             if self.mode == 1:
-				print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+"Error in get_id.")
+				print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
 
 
     def loopcheck(self):
-        print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+"Checking " + str(self.vodchecker.userid) + " every " + str(self.vodchecker.refresh) + " seconds. Get links with " + str(self.vodchecker.quality) + " quality.")
+        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(self.vodchecker.userid) + " every " + str(self.vodchecker.refresh) + " seconds. Get links with " + str(self.vodchecker.quality) + " quality.")
         while True:
             status, info = self.check_user()
             if status == 2:
-                print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
                 time.sleep(self.refresh)
             elif status == 3:
-                print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+"Unexpected error.")
+                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
                 time.sleep(self.refresh)
             elif status == 1:
                 if self.mode == 1:
-					print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
+					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
                 time.sleep(self.refresh)
             elif status == 0:
                 if self.mode == 1:
-                    print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
                 
                 # start streamlink process
                 self.vodchecker.run(mode=self.mode)
 
-                #print("["+datetime.datetime.now().strftime("%Hh%Mm%Ss")+"] "+"Done fetching.")
+                #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
                 time.sleep(self.refresh)
                     
 def main(argv):
