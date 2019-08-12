@@ -52,7 +52,7 @@ class twitchvodparser:
             else:
 			    if mode == 1:
 				    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
-        except gspread.exceptions.GSpreadException as e:
+        except gspread.exceptions and requests.exceptions as e:
             print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error.")
 
     def check_user(self):
