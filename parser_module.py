@@ -17,7 +17,7 @@ import getopt
 import config
 import client_twitch_oauth
 
-streamlink = streamlink.Streamlink()
+streaml = streamlink.Streamlink()
 scope = ["https://spreadsheets.google.com/feeds"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
 client = gspread.authorize(creds)
@@ -35,7 +35,7 @@ class twitchvodparser:
 		# user configuration
 		self.userid = ""
 		self.quality = ""
-		streamlink.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
+		streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def run(self, mode=0):
         # make sure the interval to check user availability is not less than 15 seconds
@@ -80,7 +80,10 @@ class twitchvodparser:
 				memesquality = self.quality
 				m3u8check = False
 				time.sleep(1.5)
-				streams = streamlink.streams(info['data'][x]['url'])
+				try:
+					streams = streaml.streams(info['data'][x]['url'])
+				except streamlink.exceptions.PluginError as e:
+					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
 				if memesquality not in streams:
 					memesquality = "best"
 				if sheet.findall(streams[memesquality].url) == []:
