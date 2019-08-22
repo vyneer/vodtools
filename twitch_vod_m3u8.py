@@ -73,7 +73,7 @@ class launcher:
             if self.mode == 1:
                 print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
             self.vodchecker.userid = info["data"][0]["id"]
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             if self.mode == 1:
 				print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
 

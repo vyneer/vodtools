@@ -52,7 +52,7 @@ class twitchvodparser:
             else:
 			    if mode == 1:
 				    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
-        except gspread.exceptions and requests.exceptions as e:
+        except gspread.exceptions.APIError and requests.exceptions:
             print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error.")
 
     def check_user(self):
@@ -67,7 +67,7 @@ class twitchvodparser:
             r.raise_for_status()
             info = r.json()
             status = 0
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             status = 1
 
         return status, info
@@ -82,7 +82,7 @@ class twitchvodparser:
 				time.sleep(1.5)
 				try:
 					streams = streaml.streams(info['data'][x]['url'])
-				except streamlink.exceptions.PluginError as e:
+				except streamlink.exceptions.PluginError:
 					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
 				if memesquality not in streams:
 					memesquality = "best"
