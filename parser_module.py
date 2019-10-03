@@ -35,6 +35,7 @@ class twitchvodparser:
 		# user configuration
 		self.userid = ""
 		self.quality = ""
+		self.subonly = False
 		streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def run(self, mode=0):
@@ -80,24 +81,35 @@ class twitchvodparser:
 				memesquality = self.quality
 				m3u8check = False
 				time.sleep(1.5)
-				try:
-					streams = streaml.streams(info['data'][x]['url'])
-				except streamlink.exceptions.PluginError:
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
-				if memesquality not in streams:
-					memesquality = "best"
-				if sheet.findall(streams[memesquality].url) == []:
-					m3u8check = True
-				if mode == 1:
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[memesquality].url)
-				if m3u8check and "muted" not in streams[memesquality].url and info['data'][x]['type'] == 'archive':
-					values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[memesquality].url, 'clean']
-					sheet.append_row(values)
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added clean VOD "+ info['data'][x]['url'] + " to the list.")
-				if m3u8check and "muted" in streams[memesquality].url and info['data'][x]['type'] == 'archive':
-					values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[memesquality].url, 'muted']
-					sheet.append_row(values)
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added muted VOD "+ info['data'][x]['url'] + " to the list.")
+				if self.subonly == False:
+					try:
+						streams = streaml.streams(info['data'][x]['url'])
+					except streamlink.exceptions.PluginError:
+						print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
+					if memesquality not in streams:
+						memesquality = "best"
+					if sheet.findall(streams[memesquality].url) == []:
+						m3u8check = True
+					if mode == 1:
+						print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[memesquality].url)
+					if m3u8check and "muted" not in streams[memesquality].url and info['data'][x]['type'] == 'archive':
+						values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[memesquality].url, 'clean']
+						sheet.append_row(values)
+						print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added clean VOD "+ info['data'][x]['url'] + " to the list.")
+					if m3u8check and "muted" in streams[memesquality].url and info['data'][x]['type'] == 'archive':
+						values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[memesquality].url, 'muted']
+						sheet.append_row(values)
+						print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added muted VOD "+ info['data'][x]['url'] + " to the list.")
+				else:
+					secreturl = info['data'][x]['preview']['template'][38:80]
+					fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
+					if mode == 1:
+						print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+					if m3u8check and info['data'][x]['type'] == 'archive':
+						values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
+						sheet.append_row(values)
+						print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added clean VOD "+ info['data'][x]['url'] + " to the list.")
+
 		else:
 			print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
                     

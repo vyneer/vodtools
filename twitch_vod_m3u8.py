@@ -27,6 +27,7 @@ class launcher:
         self.vodchecker = parser_module.twitchvodparser()
         self.username = config.streamer
         self.vodchecker.quality = config.quality
+        self.vodchecker.subonly = config.subonly
         self.mode = config.debug_mode
 
     def run(self):
