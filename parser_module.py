@@ -26,16 +26,16 @@ sheet = client.open_by_url(config.doc_url).sheet1
 
 class twitchvodparser:
     def __init__(self):
-		# global configuration
-		self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
-		# get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
-		self.oauth_token = client_twitch_oauth.token
-		self.refresh = config.refresh_time
+        # global configuration
+        self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
+        # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
+        self.oauth_token = client_twitch_oauth.token
+        self.refresh = config.refresh_time
 
-		# user configuration
-		self.userid = ""
-		self.quality = ""
-		streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
+        # user configuration
+        self.userid = ""
+        self.quality = ""
+        streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def run(self, mode=0):
         # make sure the interval to check user availability is not less than 15 seconds
@@ -50,9 +50,9 @@ class twitchvodparser:
             if sheet.findall(info['data'][0]['url']) == [] or None:
                 self.loopcheck(mode=mode)
             else:
-			    if mode == 1:
-				    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
-        except gspread.exceptions.APIError and requests.exceptions:
+                if mode == 1:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
+        except gspread.exceptions.APIError as e:
             print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error.")
 
     def check_user(self):
@@ -73,33 +73,33 @@ class twitchvodparser:
         return status, info
 
     def loopcheck(self, mode=0):
-		status, info = self.check_user()
-		client.login()
-		if status == 0:
-			for x in range(len(info['data'])-1, -1, -1):
-				memesquality = self.quality
-				m3u8check = False
-				time.sleep(1.5)
-				try:
-					streams = streaml.streams(info['data'][x]['url'])
-				except streamlink.exceptions.PluginError:
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
-				if memesquality not in streams:
-					memesquality = "best"
-				if sheet.findall(streams[memesquality].url) == []:
-					m3u8check = True
-				if mode == 1:
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[memesquality].url)
-				if m3u8check and "muted" not in streams[memesquality].url and info['data'][x]['type'] == 'archive':
-					values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[memesquality].url, 'clean']
-					sheet.append_row(values)
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added clean VOD "+ info['data'][x]['url'] + " to the list.")
-				if m3u8check and "muted" in streams[memesquality].url and info['data'][x]['type'] == 'archive':
-					values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[memesquality].url, 'muted']
-					sheet.append_row(values)
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added muted VOD "+ info['data'][x]['url'] + " to the list.")
-		else:
-			print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
+        status, info = self.check_user()
+        client.login()
+        if status == 0:
+            for x in range(len(info['data'])-1, -1, -1):
+                memesquality = self.quality
+                m3u8check = False
+                time.sleep(1.5)
+                try:
+                    streams = streaml.streams(info['data'][x]['url'])
+                except streamlink.exceptions.PluginError:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
+                if memesquality not in streams:
+                    memesquality = "best"
+                if sheet.findall(streams[memesquality].url) == []:
+                    m3u8check = True
+                if mode == 1:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[memesquality].url)
+                if m3u8check and "muted" not in streams[memesquality].url and info['data'][x]['type'] == 'archive':
+                    values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[memesquality].url, 'clean']
+                    sheet.append_row(values)
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added clean VOD "+ info['data'][x]['url'] + " to the list.")
+                if m3u8check and "muted" in streams[memesquality].url and info['data'][x]['type'] == 'archive':
+                    values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[memesquality].url, 'muted']
+                    sheet.append_row(values)
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added muted VOD "+ info['data'][x]['url'] + " to the list.")
+        else:
+            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
                     
 def main(argv):
     twitch_vod_parser = twitchvodparser()
