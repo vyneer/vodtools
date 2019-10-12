@@ -76,7 +76,7 @@ class launcher:
             self.vodchecker.userid = info["data"][0]["id"]
         except requests.exceptions.RequestException:
             if self.mode == 1:
-				print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
+                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
 
 
     def loopcheck(self):
@@ -91,7 +91,7 @@ class launcher:
                 time.sleep(self.refresh)
             elif status == 1:
                 if self.mode == 1:
-					print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
                 time.sleep(self.refresh)
             elif status == 0:
                 if self.mode == 1:
