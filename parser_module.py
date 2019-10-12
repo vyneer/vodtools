@@ -26,13 +26,13 @@ sheet = client.open_by_url(config.doc_url).sheet1
 
 class twitchvodparser:
     def __init__(self):
-		# global configuration
+        # global configuration
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
-		# get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
+        # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
         self.oauth_token = client_twitch_oauth.token
         self.refresh = config.refresh_time
 
-		# user configuration
+        # user configuration
         self.userid = ""
         self.quality = ""
         self.subonly = False
@@ -53,7 +53,7 @@ class twitchvodparser:
             else:
                 if mode == 1:
                     print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
-        except Exception as e:
+        except gspread.exceptions.APIError as e:
             print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable.")
             print(e)
 
@@ -102,7 +102,8 @@ class twitchvodparser:
                         sheet.append_row(values)
                         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added muted VOD "+ info['data'][x]['url'] + " to the list.")
                 else:
-                    secreturl = info['data'][x]['preview']['template'][38:80]
+                    secreturl = info['data'][x]['thumbnail_url'][38:80]
+                    print(secreturl)
                     fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
                     if mode == 1:
                         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
