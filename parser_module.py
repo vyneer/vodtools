@@ -103,14 +103,19 @@ class twitchvodparser:
                         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added muted VOD "+ info['data'][x]['url'] + " to the list.")
                 else:
                     secreturl = info['data'][x]['thumbnail_url'][38:80]
-                    print(secreturl)
-                    fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
-                    if mode == 1:
-                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
-                    if m3u8check and info['data'][x]['type'] == 'archive':
-                        values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
-                        sheet.append_row(values)
-                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added clean VOD "+ info['data'][x]['url'] + " to the list.")
+                    if secreturl != "":
+                        fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
+                        if sheet.findall(fullurl) == []:
+                            m3u8check = True
+                        if mode == 1:
+                            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+                        if m3u8check and info['data'][x]['type'] == 'archive':
+                            values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
+                            sheet.append_row(values)
+                            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added subonly VOD "+ info['data'][x]['url'] + " to the list.")
+                    else:
+                        if mode==1:
+                            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No thumbnail available at the moment. Retrying.")
 
         else:
             print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
