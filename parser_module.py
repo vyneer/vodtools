@@ -4,6 +4,7 @@
 
 import gspread
 import streamlink
+import m3u8
 from oauth2client.service_account import ServiceAccountCredentials
 import pytz
 import requests
@@ -45,7 +46,7 @@ class twitchvodparser:
             self.refresh = 15
             print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"System set check interval to 15 seconds.")
 
-        status, info = self.check_user()
+        info = self.check_user()[1]
         client.login()
         try:
             if sheet.findall(info['data'][0]['url']) == [] or None:
@@ -102,7 +103,7 @@ class twitchvodparser:
                         sheet.append_row(values)
                         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added muted VOD "+ info['data'][x]['url'] + " to the list.")
                 else:
-                    secreturl = info['data'][x]['thumbnail_url'][38:80]
+                    secreturl = info['data'][x]['thumbnail_url'][37:88]
                     if secreturl != "":
                         fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
                         if sheet.findall(fullurl) == []:

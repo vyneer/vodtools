@@ -29,6 +29,7 @@ class launcher:
         self.vodchecker.quality = config.quality
         self.vodchecker.subonly = config.subonly
         self.mode = config.debug_mode
+        self.old_status = 0
 
     def run(self):
         # make sure the interval to check user availability is not less than 15 seconds
@@ -62,7 +63,7 @@ class launcher:
                 if e.response.reason == 'Not Found' or e.response.reason == 'Unprocessable Entity':
                     status = 2
 
-        return status, info
+        return status
 
     def get_id(self):
         url = 'https://api.twitch.tv/helix/users?login=' + self.username
@@ -82,26 +83,53 @@ class launcher:
     def loopcheck(self):
         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(self.vodchecker.userid) + " every " + str(self.vodchecker.refresh) + " seconds. Get links with " + str(self.vodchecker.quality) + " quality.")
         while True:
-            status, info = self.check_user()
-            if status == 2:
-                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
-                time.sleep(self.refresh)
-            elif status == 3:
-                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
-                time.sleep(self.refresh)
-            elif status == 1:
-                if self.mode == 1:
-                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
-                time.sleep(self.refresh)
-            elif status == 0:
-                if self.mode == 1:
-                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
+            status = self.check_user()
+            if self.vodchecker.subonly == False:
+                if status == 2:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                    time.sleep(self.refresh)
+                elif status == 3:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
+                    time.sleep(self.refresh)
+                elif status == 1:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
+                    time.sleep(self.refresh)
+                elif status == 0:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
                 
-                # start streamlink process
-                self.vodchecker.run(mode=self.mode)
+                    # start streamlink process
+                    self.vodchecker.run(mode=self.mode)
 
-                #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
-                time.sleep(self.refresh)
+                    #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
+                    time.sleep(self.refresh)
+            else:
+                if status == 2:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                    time.sleep(self.refresh)
+                elif status == 3:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
+                    time.sleep(self.refresh)
+                elif status == 0:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently online, checking again in " + str(self.refresh) + " seconds.")
+                    self.old_status = status
+                    time.sleep(self.refresh)
+                elif status == 1 and self.old_status == 1:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " is still offline, checking again in " + str(self.refresh) + " seconds.")
+                    time.sleep(self.refresh)
+                elif status == 1 and self.old_status == 0:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" went offline. Fetching vods.")
+                
+                    # start streamlink process
+                    self.vodchecker.run(mode=self.mode)
+                    self.old_status = status
+
+                    #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
+                    time.sleep(self.refresh)
                     
 def main(argv):
     twitch_launcher = launcher()
