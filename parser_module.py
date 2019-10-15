@@ -56,7 +56,6 @@ class twitchvodparser:
                     print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
         except gspread.exceptions.APIError as e:
             print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable.")
-            print(e)
 
     def check_user(self):
         # 0: online, 
