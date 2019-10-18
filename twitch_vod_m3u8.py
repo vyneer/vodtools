@@ -22,8 +22,114 @@ import threading
 streaml = streamlink.Streamlink()
 scope = ["https://spreadsheets.google.com/feeds"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
+class meme(threading.Thread):
+    def __init__(self, username, quality, subonly, gsheets_url):
+        threading.Thread.__init__(self)
+        # global configuration
+        self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
+        # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
+        self.oauth_token = client_twitch_oauth.token
+        self.refresh = config.refresh_time
+        
+        # user configuration
+        self.username = username
+        self.quality = quality
+        self.subonly = subonly
+        self.gsheets_url = gsheets_url
+        self.mode = config.debug_mode
+        self.old_status = 0
+        self.vodchecker = parser_module.twitchvodparser()
+        streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
-class launcher:
+    def run(self):
+        self.loopcheck()    
+
+    def check_online(self):
+        # 0: online, 
+        # 1: offline, 
+        # 2: not found, 
+        # 3: error
+        url = 'https://api.twitch.tv/kraken/streams/' + self.username
+        info = None
+        status = 3
+        try:
+            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+            r.raise_for_status()
+            info = r.json()
+            if info['stream'] == None:
+                status = 1
+            else:
+                status = 0
+        except requests.exceptions.RequestException as e:
+            if e.response:
+                if e.response.reason == 'Not Found' or e.response.reason == 'Unprocessable Entity':
+                    status = 2
+
+        return status
+
+    def get_id(self):
+        url = 'https://api.twitch.tv/helix/users?login=' + self.username
+        info = None
+        r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+        r.raise_for_status()
+        info = r.json()
+        if self.mode == 1:
+            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+        
+        return info["data"][0]["id"]
+
+    def loopcheck(self):
+        user_id = self.get_id()
+        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(user_id) + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
+        while True:
+            status = self.check_online()
+            if self.subonly == False:
+                if status == 2:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                    time.sleep(self.refresh)
+                elif status == 3:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
+                    time.sleep(self.refresh)
+                elif status == 1:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
+                    time.sleep(self.refresh)
+                elif status == 0:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
+                
+                    # start streamlink process
+                    self.vodchecker.run(mode=self.mode, user_id=user_id, quality=self.quality, subonly=self.subonly, gsheets_url=self.gsheets_url)
+
+                    #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
+                    time.sleep(self.refresh)
+            else:
+                if status == 2:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                    time.sleep(self.refresh)
+                elif status == 3:
+                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
+                    time.sleep(self.refresh)
+                elif status == 0:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently online, checking again in " + str(self.refresh) + " seconds.")
+                    self.old_status = status
+                    time.sleep(self.refresh)
+                elif status == 1 and self.old_status == 1:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " is still offline, checking again in " + str(self.refresh) + " seconds.")
+                    time.sleep(self.refresh)
+                elif status == 1 and self.old_status == 0:
+                    if self.mode == 1:
+                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" went offline. Fetching vods.")
+                
+                    # start streamlink process
+                    self.vodchecker.run(mode=self.mode, user_id=user_id, quality=self.quality, subonly=self.subonly, gsheets_url=self.gsheets_url)
+                    self.old_status = status
+
+                    #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
+                    time.sleep(self.refresh)
+class launcher():
     def __init__(self):
         # global configuration
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
@@ -49,9 +155,12 @@ class launcher:
             username_str = username_str + stream['username'] + "/"
         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking for " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         for stream in stream_list['list']:
-            test = threading.Thread(target=self.loopcheck, args=(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'],))
+            test = meme(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'])
+            test.daemon = True
             test.start()
+            time.sleep(2)
 
+'''
     def check_online(self, username):
         # 0: online, 
         # 1: offline, 
@@ -75,39 +184,18 @@ class launcher:
 
         return status
 
-    def check_vods(self, user_id):
-        # 0: online, 
-        # 1: offline, 
-        # 2: not found, 
-        # 3: error
-        url = 'https://api.twitch.tv/helix/videos?user_id=' + user_id
-        info = None
-        try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
-            r.raise_for_status()
-            info = r.json()
-            status = 0
-        except requests.exceptions.RequestException:
-            status = 1
-
-        return status, info
-
     def get_id(self, username):
         url = 'https://api.twitch.tv/helix/users?login=' + username
         info = None
-        try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
-            r.raise_for_status()
-            info = r.json()
-            if self.mode == 1:
-                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
-        except requests.exceptions.RequestException as e:
-            if self.mode == 1:
-                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
+        r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+        r.raise_for_status()
+        info = r.json()
+        if self.mode == 1:
+            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
         
         return info["data"][0]["id"]
 
-    '''def vodchecker(self, mode, user_id, quality, subonly, sheet):
+    def vodchecker(self, mode, user_id, quality, subonly, sheet):
         status, info = self.check_vods(user_id)
         client.login()
         try:
@@ -158,7 +246,7 @@ class launcher:
                     print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
         except gspread.exceptions.APIError as e:
             print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable.")
-'''
+
 
     def loopcheck(self, username, quality, subonly, gsheets_url):
         vodchecker = parser_module.twitchvodparser()
@@ -212,7 +300,7 @@ class launcher:
 
                     #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
                     time.sleep(self.refresh)
-
+'''
     
                     
 def main(argv):
