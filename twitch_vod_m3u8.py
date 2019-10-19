@@ -22,7 +22,8 @@ import threading
 streaml = streamlink.Streamlink()
 scope = ["https://spreadsheets.google.com/feeds"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
-class meme(threading.Thread):
+
+class vodthread(threading.Thread):
     def __init__(self, username, quality, subonly, gsheets_url):
         threading.Thread.__init__(self)
         # global configuration
@@ -42,7 +43,7 @@ class meme(threading.Thread):
         streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def run(self):
-        self.loopcheck()    
+        self.loopcheck()  
 
     def check_online(self):
         # 0: online, 
@@ -151,14 +152,25 @@ class launcher():
         with open("stream_list.json") as f:
             stream_list = json.load(f)
         username_str = ""
+        i=0
         for stream in stream_list['list']:
-            username_str = username_str + stream['username'] + "/"
+            i+=1
+        i_max = i
+        i=0
+        for stream in stream_list['list']:
+            i+=1
+            if i==i_max:
+                username_str = username_str + stream['username']
+            else:
+                username_str = username_str + stream['username'] + ", "
         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking for " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         for stream in stream_list['list']:
-            test = meme(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'])
-            test.daemon = True
-            test.start()
+            thread = vodthread(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'])
+            thread.daemon = True
+            thread.start()
             time.sleep(2)
+        while True:
+            time.sleep(1)
 
 '''
     def check_online(self, username):
