@@ -174,6 +174,7 @@ class vodthread(threading.Thread):
                         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
                 
                     # start streamlink process
+                    client.login()
                     self.vodchecker()
 
                     #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
@@ -199,6 +200,7 @@ class vodthread(threading.Thread):
                         print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" went offline. Fetching vods.")
                 
                     # start streamlink process
+                    client.login()
                     self.vodchecker()
                     self.old_status = status
 
