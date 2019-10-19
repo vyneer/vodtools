@@ -133,3 +133,4 @@ dmypy.json
 client_secret.json
 client_twitch_oauth.py
 twitch_vod_m3u8.code-workspace
+.vscode
