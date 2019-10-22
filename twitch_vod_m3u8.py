@@ -114,22 +114,22 @@ class vodthread(threading.Thread):
                         if self.subonly == False:
                             try:
                                 streams = streaml.streams(info['data'][x]['url'])
+                                if self.quality not in streams:
+                                    self.quality = "best"
+                                if sheet.findall(streams[self.quality].url) == []:
+                                    m3u8check = True
+                                if self.mode == 1:
+                                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
+                                if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
+                                    values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
+                                    sheet.append_row(values)
+                                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
+                                if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
+                                    values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
+                                    sheet.append_row(values)
+                                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
                             except streamlink.exceptions.PluginError:
                                 print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
-                            if self.quality not in streams:
-                                self.quality = "best"
-                            if sheet.findall(streams[self.quality].url) == []:
-                                m3u8check = True
-                            if self.mode == 1:
-                                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
-                            if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
-                                sheet.append_row(values)
-                                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
-                            if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
-                                sheet.append_row(values)
-                                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
                         else:
                             secreturl = info['data'][x]['thumbnail_url'][37:88]
                             if secreturl != "":
