@@ -8,21 +8,71 @@ import streamlink
 from oauth2client.service_account import ServiceAccountCredentials
 import pytz
 import requests
-import os
 import time
 import json
 import sys
-import subprocess
 import datetime
-import getopt
 import config
 import client_twitch_oauth
 import threading
+import argparse
+import m3u8
 
 streaml = streamlink.Streamlink()
 scope = ["https://spreadsheets.google.com/feeds"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
 client = gspread.authorize(creds)
+
+class genmuted():
+    def __init__(self, url):
+        self.url=url
+
+    def loadM3u8(self, m3u8url):
+        def load_m3u8(url):
+            urls = []
+            m = m3u8.load(url)
+            for seg in m.segments:
+                urls.append(seg.absolute_uri)
+            return urls
+        try:
+            videoUrls = load_m3u8(m3u8url)
+        except Exception as e:
+            return {'reason': 'load_m3u8 {}'.format(e)} 
+        else:
+            return {'videoUrls': videoUrls}
+    
+    def run(self):
+        yourl = self.url[:-14]
+
+        r = requests.get(self.url, stream=True)
+        open("index-dvr.m3u8", "wb").write(r.content)
+
+        tslinks = self.loadM3u8("index-dvr.m3u8")
+        i=0
+
+        with open("buffer.txt", "w") as f:
+            for tsurl in tslinks['videoUrls']:
+                i+=1
+                r = requests.head(yourl + tsurl)
+                if r.status_code == 403:
+                    tsurl = yourl + tsurl[:-3] + "-muted.ts"
+                    print('\nfixed\n')
+                    print(tsurl)
+                    f.writelines(tsurl+'\n')
+                elif r.status_code == 200:
+                    tsurl = yourl + tsurl
+                    print('\nskipped\n')
+                    print(tsurl)
+                    f.writelines(tsurl+'\n')
+
+        a=9
+
+        lines = open("index-dvr.m3u8").read().splitlines()
+        with open("buffer.txt", "r") as f:
+            for line in f:
+                lines[a]=line.rstrip()
+                a+=2
+        open('index-dvr-muted.m3u8','w').write('\n'.join(lines))
 
 class vodthread(threading.Thread):
     def __init__(self, username, quality, subonly, gsheets_url):
@@ -208,6 +258,7 @@ class vodthread(threading.Thread):
 
                     #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
                     time.sleep(self.refresh)
+
 class launcher():
     def __init__(self):
         self.refresh = config.refresh_time
@@ -244,8 +295,16 @@ class launcher():
             time.sleep(1)    
                     
 def main(argv):
-    twitch_launcher = launcher()
-    twitch_launcher.run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
+    parser.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet.", action="store_true")
+    args = parser.parse_args()
+    if args.crawl == True:
+        twitch_launcher = launcher()
+        twitch_launcher.run()
+    if args.genmuted:
+        twitch_launcher = genmuted(args.genmuted)
+        twitch_launcher.run()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
