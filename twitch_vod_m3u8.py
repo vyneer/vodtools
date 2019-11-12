@@ -315,6 +315,9 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
     parser.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet.", action="store_true")
+    if len(sys.argv)==1:
+        parser.print_help()
+        sys.exit(0)
     args = parser.parse_args()
     if args.crawl == True:
         twitch_launcher = launcher()
