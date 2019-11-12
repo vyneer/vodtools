@@ -90,6 +90,7 @@ class vodthread(threading.Thread):
         self.gsheets_url = gsheets_url
         self.mode = config.debug_mode
         self.old_status = 0
+        self.user_id = None
         self.user_id = self.get_id()
         streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
@@ -143,11 +144,14 @@ class vodthread(threading.Thread):
             r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            if self.mode == 1:
-                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+            if info['data'] != []:
+                if self.mode == 1:
+                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+            else:
+                return None
         except requests.exceptions.RequestException:
             if self.mode == 1:
-                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
+                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
         
         return info["data"][0]["id"]
 
@@ -170,17 +174,17 @@ class vodthread(threading.Thread):
                                     if sheet.findall(streams[self.quality].url) == []:
                                         m3u8check = True
                                     if self.mode == 1:
-                                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
+                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
                                     if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
                                         values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
                                         sheet.append_row(values)
-                                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
+                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
                                     if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
                                         values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
                                         sheet.append_row(values)
-                                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
+                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
                                 except streamlink.exceptions.PluginError:
-                                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
+                                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
                             else:
                                 secreturl = info['data'][x]['thumbnail_url'][37:88]
                                 if secreturl != "":
@@ -188,42 +192,42 @@ class vodthread(threading.Thread):
                                     if sheet.findall(fullurl) == []:
                                         m3u8check = True
                                     if self.mode == 1:
-                                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
                                     if m3u8check and info['data'][x]['type'] == 'archive':
                                         values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
                                         sheet.append_row(values)
-                                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
+                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
                                 else:
                                     if self.mode==1:
-                                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No thumbnail available at the moment for "+ str(self.username) + ". Retrying.")
+                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No thumbnail available at the moment for "+ str(self.username) + ". Retrying.")
                         else:
-                            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
+                            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
                 else:
                     if self.mode == 1:
-                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
+                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
             except gspread.exceptions.APIError as e:
-                print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable. Code: " + str(e))
+                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable. Code: " + str(e))
         except gspread.exceptions.APIError as e:
-            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable. Code: " + str(e))
+            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable. Code: " + str(e))
 
     def loopcheck(self):
-        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
+        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
         while True:
             status = self.check_online()
             if self.subonly == False:
                 if status == 2:
-                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
                     time.sleep(self.refresh)
                 elif status == 3:
-                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
+                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
                     time.sleep(self.refresh)
                 elif status == 1:
                     if self.mode == 1:
-                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
+                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
                     time.sleep(self.refresh)
                 elif status == 0:
                     if self.mode == 1:
-                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
+                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
                 
                     # start streamlink process
                     client.login()
@@ -233,23 +237,23 @@ class vodthread(threading.Thread):
                     time.sleep(self.refresh)
             else:
                 if status == 2:
-                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
                     time.sleep(self.refresh)
                 elif status == 3:
-                    print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
+                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
                     time.sleep(self.refresh)
                 elif status == 0:
                     if self.mode == 1:
-                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently online, checking again in " + str(self.refresh) + " seconds.")
+                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently online, checking again in " + str(self.refresh) + " seconds.")
                     self.old_status = status
                     time.sleep(self.refresh)
                 elif status == 1 and self.old_status == 1:
                     if self.mode == 1:
-                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " is still offline, checking again in " + str(self.refresh) + " seconds.")
+                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " is still offline, checking again in " + str(self.refresh) + " seconds.")
                     time.sleep(self.refresh)
                 elif status == 1 and self.old_status == 0:
                     if self.mode == 1:
-                        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" went offline. Fetching vods.")
+                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" went offline. Fetching vods.")
                 
                     # start streamlink process
                     client.login()
@@ -263,13 +267,14 @@ class launcher():
     def __init__(self):
         self.refresh = config.refresh_time
         self.mode = config.debug_mode
+        self.threads = []
 
     def run(self):
         # make sure the interval to check user availability is not less than 15 seconds
         if(self.refresh < 15):
-            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Check interval should not be lower than 15 seconds.")
+            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Check interval should not be lower than 15 seconds.")
             self.refresh = 15
-            print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"System set check interval to 15 seconds.")
+            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"System set check interval to 15 seconds.")
         with open("stream_list.json") as f:
             stream_list = json.load(f)
         username_str = ""
@@ -284,15 +289,28 @@ class launcher():
                 username_str = username_str + stream['username']
             else:
                 username_str = username_str + stream['username'] + ", "
-        print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
+        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
+        i=1
         for stream in stream_list['list']:
             thread = vodthread(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'])
             thread.daemon = True
-            thread.name = stream['username'] + "-thread"
+            thread.name =  str(i)+"-"+ stream['username'] + "-thread"
+            self.threads.append(thread)
+            i+=1
             thread.start()
             time.sleep(2)
         while True:
-            time.sleep(1)    
+            time.sleep(1)
+            for t in self.threads:
+                if t.is_alive() != True:
+                    n_in_list = t.name[:1]
+                    n_in_list = int(n_in_list) - 1
+                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'], stream_list['list'][n_in_list]['gsheets'])
+                    thread.daemon = True
+                    thread.name = t.name
+                    self.threads.append(thread)
+                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Thread "+t.name+" has crashed unexpectedly. Relaunching.")
+                    thread.start()
                     
 def main(argv):
     parser = argparse.ArgumentParser()
