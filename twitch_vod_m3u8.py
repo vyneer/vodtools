@@ -2,7 +2,6 @@
 # You can read more details at: https://www.junian.net/2017/01/how-to-record-twitch-streams.html
 # original code is from https://slicktechies.com/how-to-watchrecord-twitch-streams-using-livestreamer/
 
-#import parser_module
 import gspread
 import streamlink
 from oauth2client.service_account import ServiceAccountCredentials
