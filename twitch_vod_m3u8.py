@@ -147,7 +147,7 @@ class vodthread(threading.Thread):
                 if self.mode == 1:
                     print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
             else:
-                return None
+                return "banned"
         except requests.exceptions.RequestException:
             if self.mode == 1:
                 print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
