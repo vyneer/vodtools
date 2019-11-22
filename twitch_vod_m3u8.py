@@ -160,7 +160,7 @@ class vodthread(threading.Thread):
             status, info = self.check_videos()
             client.login()
             try:
-                if info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
+                if info['data'] != [] or None and sheet.findall(info['data'][0]['url']) == [] or None:
                     if status == 0:
                         for x in range(len(info['data'])-1, -1, -1):
                             m3u8check = False
