@@ -1,28 +1,10 @@
 {
 	"list":[
 		{
-			"username" : "destiny",
-			"quality" : "720p",
-			"subonly" : false,
-			"gsheets" : "https://docs.google.com/spreadsheets/d/1l0ZW3aMEuG8XKODREMDkuy1qfI2VjvstIx27kc1GSM4"
-		},
-		{
 			"username" : "harkdan",
 			"quality" : "720p",
 			"subonly" : true,
 			"gsheets" : "https://docs.google.com/spreadsheets/d/1MfJGUM3cRvnR4x3wZ6lCEbr8dSPMpFB_mbwlF9JqrHQ"
-		},
-		{
-			"username" : "rajjpatel",
-			"quality" : "720p",
-			"subonly" : false,
-			"gsheets" : "https://docs.google.com/spreadsheets/d/1VcM9D_bK2Pcno2pjUmY4qVkIcQ2AQ_9z67IFe3JzDQ4"
-		},
-		{
-			"username" : "badbunny",
-			"quality" : "720p",
-			"subonly" : false,
-			"gsheets" : "https://docs.google.com/spreadsheets/d/1QmFhoJsvrfNIKd8q0fde6s38fwl1m6Fpbh5o2j8SlFY"
 		}
 	]
 }
