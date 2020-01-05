@@ -1,10 +1,9 @@
 {
 	"list":[
 		{
-			"username" : "harkdan",
+			"username" : "pedguin",
 			"quality" : "720p",
-			"subonly" : true,
-			"gsheets" : "https://docs.google.com/spreadsheets/d/1MfJGUM3cRvnR4x3wZ6lCEbr8dSPMpFB_mbwlF9JqrHQ"
+			"subonly" : true
 		}
 	]
 }

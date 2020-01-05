@@ -2,9 +2,7 @@
 # You can read more details at: https://www.junian.net/2017/01/how-to-record-twitch-streams.html
 # original code is from https://slicktechies.com/how-to-watchrecord-twitch-streams-using-livestreamer/
 
-import gspread
 import streamlink
-from oauth2client.service_account import ServiceAccountCredentials
 import pytz
 import requests
 import time
@@ -17,11 +15,10 @@ import threading
 import argparse
 import m3u8
 import re
+import sqlite3
+import pathlib
 
 streaml = streamlink.Streamlink()
-scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
-creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
-client = gspread.authorize(creds)
 
 class gensingle():
     def __init__(self, username):
@@ -34,7 +31,6 @@ class gensingle():
         self.mode = config.debug_mode
         self.user_id = None
         self.user_id = self.get_id()
-        streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def find_anipreview(self, vod_id):
         url = 'https://api.twitch.tv/kraken/videos/' + vod_id
@@ -105,16 +101,6 @@ class gensingle():
             else:
                  print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error.")
                 
-class sheetmaker():
-    def __init__(self, makesheet):
-        self.sheetname=makesheet[0]+" m3u8 VOD links"
-        self.shareemail=makesheet[1]
-        
-    def run(self):
-        kek = client.create(self.sheetname)
-        kek.share(self.shareemail, perm_type='user', role='writer')
-        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Created the spreadsheet. Check your email for the URL.")
-    
 class genmuted():
     def __init__(self, url):
         self.url=url
@@ -167,7 +153,7 @@ class genmuted():
         open('index-dvr-muted.m3u8','w').write('\n'.join(lines))
 
 class vodthread(threading.Thread):
-    def __init__(self, username, quality, subonly, gsheets_url):
+    def __init__(self, username, quality, subonly):
         threading.Thread.__init__(self)
         # global configuration
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
@@ -179,7 +165,6 @@ class vodthread(threading.Thread):
         self.username = username
         self.quality = quality
         self.subonly = subonly
-        self.gsheets_url = gsheets_url
         self.mode = config.debug_mode
         self.old_status = 0
         self.user_id = None
@@ -262,59 +247,62 @@ class vodthread(threading.Thread):
         return info["data"][0]["id"]
 
     def vodchecker(self):
-        try:
-            sheet = client.open_by_url(self.gsheets_url).sheet1
-            status, info = self.check_videos()
-            client.login()
-            try:
-                if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
-                    if status == 0:
-                        for x in range(len(info['data'])-1, -1, -1):
-                            m3u8check = False
-                            time.sleep(1.5)
-                            if self.subonly == False:
-                                try:
-                                    streams = streaml.streams(info['data'][x]['url'])
-                                    if self.quality not in streams:
-                                        self.quality = "best"
-                                    if sheet.findall(streams[self.quality].url) == []:
-                                        m3u8check = True
-                                    if self.mode == 1:
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
-                                    if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                        values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
-                                        sheet.append_row(values)
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
-                                    if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                        values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
-                                        sheet.append_row(values)
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
-                                except streamlink.exceptions.PluginError:
-                                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
-                            else:
-                                secreturl = self.find_anipreview(info['data'][x]['id'])
-                                if secreturl != "":
-                                    fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
-                                    if sheet.findall(fullurl) == []:
-                                        m3u8check = True
-                                    if self.mode == 1:
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
-                                    if m3u8check and info['data'][x]['type'] == 'archive':
-                                        values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
-                                        sheet.append_row(values)
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
-                                else:
-                                    if self.mode==1:
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+        path = pathlib.Path(self.username + "_vods.db")
+        if path.exists() != True:
+            conn = sqlite3.connect(self.username + "_vods.db")
+            cursor=conn.cursor()
+            cursor.execute("""CREATE TABLE vods (timecode text, title text, twitchurl text, vodurl text, type text)""")
+        conn = sqlite3.connect(self.username + "_vods.db")
+        status, info = self.check_videos()
+        cursor=conn.cursor()
+        cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
+        if info != None and info['data'] != [] and cursor.fetchone() is None:
+            if status == 0:
+                for x in range(len(info['data'])-1, -1, -1):
+                    m3u8check = False
+                    time.sleep(1.5)
+                    if self.subonly == False:
+                        try:
+                            streams = streaml.streams(info['data'][x]['url'])
+                            if self.quality not in streams:
+                                self.quality = "best"
+                            cursor.execute('SELECT * FROM vods WHERE vodurl=?', (streams[self.quality].url))
+                            if cursor.fetchone() is None:
+                                m3u8check = True
+                            if self.mode == 1:
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
+                            if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
+                                values = [([info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean'])]
+                                cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
+                            if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
+                                values = [([info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted'])]
+                                cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
+                        except streamlink.exceptions.PluginError:
+                            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
                     else:
-                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
-                else:
-                    if self.mode == 1:
-                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
-            except gspread.exceptions.APIError as e:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable. Code: " + str(e))
-        except gspread.exceptions.APIError as e:
-            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable. Code: " + str(e))
+                        secreturl = self.find_anipreview(info['data'][x]['id'])
+                        if secreturl != "":
+                            fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
+                            cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
+                            if cursor.fetchone() is None:
+                                m3u8check = True
+                            if self.mode == 1:
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+                            if m3u8check and info['data'][x]['type'] == 'archive':
+                                values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
+                                cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
+                        else:
+                            if self.mode==1:
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+                    conn.commit()
+            else:
+                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
+        else:
+            if self.mode == 1:
+                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
 
     def loopcheck(self):
         print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
@@ -335,7 +323,6 @@ class vodthread(threading.Thread):
                     print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
                 
                 # start streamlink process
-                client.login()
                 self.vodchecker()
 
                 #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
@@ -370,7 +357,7 @@ class launcher():
         print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         i=1
         for stream in stream_list['list']:
-            thread = vodthread(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'])
+            thread = vodthread(stream['username'], stream['quality'], stream['subonly'])
             thread.daemon = True
             thread.name =  str(i)+"-"+ stream['username'] + "-thread"
             self.threads.append(thread)
@@ -383,7 +370,7 @@ class launcher():
                 if t.is_alive() != True:
                     n_in_list = t.name[:1]
                     n_in_list = int(n_in_list) - 1
-                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'], stream_list['list'][n_in_list]['gsheets'])
+                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'])
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
@@ -393,16 +380,12 @@ class launcher():
 def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
-    parser.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet.", action="store_true")
+    parser.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a sqlite db.", action="store_true")
     parser.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
-    parser.add_argument("--makesheet", "-ms", nargs=2, metavar=('sheetname','shareemail'), help="Creates and shares a spreadsheet.", type=str)
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(0)
     args = parser.parse_args()
-    if args.makesheet:
-        twitch_launcher = sheetmaker(args.makesheet)
-        twitch_launcher.run()
     if args.crawl == True:
         twitch_launcher = launcher()
         twitch_launcher.run()

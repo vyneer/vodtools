@@ -137,3 +137,4 @@ meme.py
 .vscode
 *.m3u8
 buffer.txt
+*.db
