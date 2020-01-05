@@ -18,10 +18,20 @@ import argparse
 import m3u8
 
 streaml = streamlink.Streamlink()
-scope = ["https://spreadsheets.google.com/feeds"]
+scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
 creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
 client = gspread.authorize(creds)
 
+class sheetmaker():
+    def __init__(self, makesheet):
+        self.sheetname=makesheet[0]+" m3u8 VOD links"
+        self.shareemail=makesheet[1]
+        
+    def run(self):
+        kek = client.create(self.sheetname)
+        kek.share(self.shareemail, perm_type='user', role='writer')
+        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Created the spreadsheet. Check your email for the URL.")
+    
 class genmuted():
     def __init__(self, url):
         self.url=url
@@ -300,10 +310,14 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
     parser.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet.", action="store_true")
+    parser.add_argument("--makesheet", "-ms", nargs=2, metavar=('sheetname','shareemail'), help="Creates and shares a spreadsheet.", type=str)
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(0)
     args = parser.parse_args()
+    if args.makesheet:
+        twitch_launcher = sheetmaker(args.makesheet)
+        twitch_launcher.run()
     if args.crawl == True:
         twitch_launcher = launcher()
         twitch_launcher.run()
