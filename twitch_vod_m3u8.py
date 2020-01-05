@@ -16,12 +16,95 @@ import client_twitch_oauth
 import threading
 import argparse
 import m3u8
+import re
 
 streaml = streamlink.Streamlink()
 scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
 creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
 client = gspread.authorize(creds)
 
+class gensingle():
+    def __init__(self, username):
+        self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
+        # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
+        self.oauth_token = client_twitch_oauth.token
+        
+        # user configuration
+        self.username = username
+        self.mode = config.debug_mode
+        self.user_id = None
+        self.user_id = self.get_id()
+        streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
+
+    def find_anipreview(self, vod_id):
+        url = 'https://api.twitch.tv/kraken/videos/' + vod_id
+        info = None
+        try:
+            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+            r.raise_for_status()
+            info = r.json()
+            status = 0
+        except requests.exceptions.RequestException:
+            status = 1
+        result = re.findall(r"(?<=\/)[^\/]+(?=\/)", info['animated_preview_url'])
+        return result[1]
+
+    def get_id(self):
+        url = 'https://api.twitch.tv/helix/users?login=' + self.username
+        info = None
+        try:
+            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+            r.raise_for_status()
+            info = r.json()
+            if info['data'] != []:
+                if self.mode == 1:
+                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+            else:
+                return "banned"
+        except requests.exceptions.RequestException:
+            if self.mode == 1:
+                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
+        
+        return info["data"][0]["id"]
+
+    def check_videos(self):
+        # 0: online, 
+        # 1: offline, 
+        # 2: not found, 
+        # 3: error
+        url = 'https://api.twitch.tv/helix/videos?user_id=' + self.user_id + "&first=100"
+        info = None
+        try:
+            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+            r.raise_for_status()
+            info = r.json()
+            status = 0
+        except requests.exceptions.RequestException:
+            status = 1
+
+        return status, info
+
+    def run(self):
+        status, info = self.check_videos()
+        if info != None and info['data'] != []:
+            if status == 0:
+                with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "w") as memefile:
+                    for x in range(len(info['data'])-1, -1, -1):
+                        secreturl = self.find_anipreview(info['data'][x]['id'])
+                        if secreturl != "":
+                            fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
+                            if self.mode == 1:
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+                            if info['data'][x]['type'] == 'archive':
+                                values = info['data'][x]['created_at'] + " - " + info['data'][x]['title'] + " - " + info['data'][x]['url'] + " - " + fullurl + "\n"
+                                memefile.write(values)
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
+                        else:
+                            if self.mode==1:
+                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No animated preview available at the moment for "+ str(self.username) + ".")
+            else:
+                 print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error.")
+                
 class sheetmaker():
     def __init__(self, makesheet):
         self.sheetname=makesheet[0]+" m3u8 VOD links"
@@ -134,7 +217,8 @@ class vodthread(threading.Thread):
         except requests.exceptions.RequestException:
             status = 1
 
-        return info['animated_preview_url'][34:85]
+        result = re.findall(r"(?<=\/)[^\/]+(?=\/)", info['animated_preview_url'])
+        return result[1]
 
     def check_online(self):
         # 0: online, 
@@ -310,6 +394,7 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
     parser.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet.", action="store_true")
+    parser.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
     parser.add_argument("--makesheet", "-ms", nargs=2, metavar=('sheetname','shareemail'), help="Creates and shares a spreadsheet.", type=str)
     if len(sys.argv)==1:
         parser.print_help()
@@ -320,6 +405,9 @@ def main(argv):
         twitch_launcher.run()
     if args.crawl == True:
         twitch_launcher = launcher()
+        twitch_launcher.run()
+    if args.single:
+        twitch_launcher = gensingle(args.single)
         twitch_launcher.run()
     if args.genmuted:
         twitch_launcher = genmuted(args.genmuted)
