@@ -266,17 +266,17 @@ class vodthread(threading.Thread):
                             streams = streaml.streams(info['data'][x]['url'])
                             if self.quality not in streams:
                                 self.quality = "best"
-                            cursor.execute('SELECT * FROM vods WHERE vodurl=?', (streams[self.quality].url))
+                            cursor.execute('SELECT * FROM vods WHERE vodurl=?', (streams[self.quality].url,))
                             if cursor.fetchone() is None:
                                 m3u8check = True
                             if self.mode == 1:
                                 print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
                             if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                values = [([info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean'])]
+                                values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
                                 cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
                                 print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
                             if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                values = [([info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted'])]
+                                values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
                                 cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
                                 print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
                         except streamlink.exceptions.PluginError:
