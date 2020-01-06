@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 logformat = logging.Formatter('[%(levelname)s][%(threadName)s][%(asctime)s] %(message)s')
 
-fileHandler = logging.FileHandler("vodtools.log")
+fileHandler = logging.FileHandler("vodtools-local.log")
 fileHandler.setFormatter(logformat)
 logger.addHandler(fileHandler)
 
