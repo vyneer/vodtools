@@ -167,13 +167,13 @@ class genmuted():
         open('index-dvr-muted.m3u8','w').write('\n'.join(lines))
 
 class vodthread(threading.Thread):
-    def __init__(self, username, quality, subonly, gsheets_url):
+    def __init__(self, username, quality, subonly, gsheets_url, refreshtime):
         threading.Thread.__init__(self)
         # global configuration
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
         # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
         self.oauth_token = client_twitch_oauth.token
-        self.refresh = config.refresh_time
+        self.refresh = refreshtime
         
         # user configuration
         self.username = username
@@ -342,8 +342,8 @@ class vodthread(threading.Thread):
                 time.sleep(self.refresh)
 
 class launcher():
-    def __init__(self):
-        self.refresh = config.refresh_time
+    def __init__(self, refreshtime):
+        self.refresh = refreshtime
         self.mode = config.debug_mode
         self.threads = []
 
@@ -370,7 +370,7 @@ class launcher():
         print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         i=1
         for stream in stream_list['list']:
-            thread = vodthread(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'])
+            thread = vodthread(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'], self.refresh)
             thread.daemon = True
             thread.name =  str(i)+"-"+ stream['username'] + "-thread"
             self.threads.append(thread)
@@ -383,7 +383,7 @@ class launcher():
                 if t.is_alive() != True:
                     n_in_list = t.name[:1]
                     n_in_list = int(n_in_list) - 1
-                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'], stream_list['list'][n_in_list]['gsheets'])
+                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'], stream_list['list'][n_in_list]['gsheets'], self.refresh)
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
@@ -392,10 +392,11 @@ class launcher():
                     
 def main(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
-    parser.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet.", action="store_true")
-    parser.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
-    parser.add_argument("--makesheet", "-ms", nargs=2, metavar=('sheetname','shareemail'), help="Creates and shares a spreadsheet.", type=str)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
+    group.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet. Default refresh time is 60 seconds.", nargs='?',type=int, const=60)
+    group.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
+    group.add_argument("--makesheet", "-ms", nargs=2, metavar=('SHEET_NAME','SHARE_EMAIL'), help="Creates and shares a spreadsheet.", type=str)
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(0)
@@ -403,8 +404,8 @@ def main(argv):
     if args.makesheet:
         twitch_launcher = sheetmaker(args.makesheet)
         twitch_launcher.run()
-    if args.crawl == True:
-        twitch_launcher = launcher()
+    if args.crawl:
+        twitch_launcher = launcher(args.crawl)
         twitch_launcher.run()
     if args.single:
         twitch_launcher = gensingle(args.single)
