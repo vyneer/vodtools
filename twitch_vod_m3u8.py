@@ -18,7 +18,6 @@ import argparse
 import m3u8
 import re
 
-streaml = streamlink.Streamlink()
 scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
 creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
 client = gspread.authorize(creds)
@@ -405,6 +404,8 @@ def main(argv):
         twitch_launcher = sheetmaker(args.makesheet)
         twitch_launcher.run()
     if args.crawl:
+        global streaml
+        streaml = streamlink.Streamlink()
         twitch_launcher = launcher(args.crawl)
         twitch_launcher.run()
     if args.single:
