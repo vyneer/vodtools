@@ -108,7 +108,7 @@ class gensingle():
                         else:
                             logger.debug("No animated preview available at the moment for "+ str(self.username) + ".")
             else:
-                 logger.info("HTTP error.")
+                 logger.error("HTTP error.")
                 
 class sheetmaker():
     def __init__(self, makesheet):
@@ -347,7 +347,7 @@ class launcher():
         if(self.refresh < 15):
             logger.warning("Check interval should not be lower than 15 seconds.")
             self.refresh = 15
-            logger.info("System set check interval to 15 seconds.")
+            logger.warning("System set check interval to 15 seconds.")
         with open("stream_list.json") as f:
             stream_list = json.load(f)
         username_str = ""
