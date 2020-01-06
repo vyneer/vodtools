@@ -243,7 +243,7 @@ class vodthread(threading.Thread):
             else:
                 return "banned"
         except requests.exceptions.RequestException as e:
-            logger.debug("Error in get_id:" + str(e))
+            logger.debug("Error in get_id: " + str(e))
         
         return info["data"][0]["id"]
 
@@ -390,7 +390,7 @@ def main(argv):
             consoleHandler.setLevel(logging.INFO)
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
-        logger.debug("Launching crawl mode.")
+        logger.info("Launching crawl mode.")
         global streaml
         streaml = streamlink.Streamlink()
         twitch_launcher = launcher(args.crawl)
@@ -404,7 +404,7 @@ def main(argv):
             consoleHandler.setLevel(logging.INFO)
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
-        logger.debug("Launching single mode.")
+        logger.info("Launching single mode.")
         twitch_launcher = gensingle(args.single)
         twitch_launcher.run()
     if args.genmuted:
@@ -416,7 +416,7 @@ def main(argv):
             consoleHandler.setLevel(logging.INFO)
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
-        logger.debug("Launching genmuted mode.")
+        logger.info("Launching genmuted mode.")
         twitch_launcher = genmuted(args.genmuted)
         twitch_launcher.run()
 
