@@ -367,7 +367,7 @@ class launcher():
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
-                    logger.warning("Thread "+t.name+" has crashed unexpectedly. Relaunching.")
+                    logger.error("Thread "+t.name+" has crashed unexpectedly. Relaunching.")
                     thread.start()
                     
 def main(argv):
