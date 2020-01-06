@@ -65,7 +65,7 @@ class gensingle():
             else:
                 return "banned"
         except requests.exceptions.RequestException as e:
-            logger.debug("Error in get_id: " + e)
+            logger.debug("Error in get_id: " + str(e))
         
         return info["data"][0]["id"]
 
@@ -243,7 +243,7 @@ class vodthread(threading.Thread):
             else:
                 return "banned"
         except requests.exceptions.RequestException as e:
-            logger.debug("Error in get_id:" + e)
+            logger.debug("Error in get_id:" + str(e))
         
         return info["data"][0]["id"]
 
@@ -279,7 +279,7 @@ class vodthread(threading.Thread):
                                 cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
                                 logger.info("Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
                         except streamlink.exceptions.PluginError as e:
-                            logger.error("Streamlink error: "+e)
+                            logger.error("Streamlink error: "+str(e))
                     else:
                         secreturl = self.find_anipreview(info['data'][x]['id'])
                         if secreturl != "":
