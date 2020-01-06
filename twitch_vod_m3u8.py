@@ -9,7 +9,6 @@ import time
 import json
 import sys
 import datetime
-import config
 import client_twitch_oauth
 import threading
 import argparse
@@ -17,8 +16,18 @@ import m3u8
 import re
 import sqlite3
 import pathlib
+import logging
 
-streaml = streamlink.Streamlink()
+logger = logging.getLogger(__name__)
+logformat = logging.Formatter('[%(levelname)s][%(threadName)s][%(asctime)s] %(message)s')
+
+fileHandler = logging.FileHandler("vodtools.log")
+fileHandler.setFormatter(logformat)
+logger.addHandler(fileHandler)
+
+consoleHandler = logging.StreamHandler(sys.stdout)
+consoleHandler.setFormatter(logformat)
+logger.addHandler(consoleHandler)
 
 class gensingle():
     def __init__(self, username):
@@ -28,7 +37,6 @@ class gensingle():
         
         # user configuration
         self.username = username
-        self.mode = config.debug_mode
         self.user_id = None
         self.user_id = self.get_id()
 
@@ -53,13 +61,11 @@ class gensingle():
             r.raise_for_status()
             info = r.json()
             if info['data'] != []:
-                if self.mode == 1:
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+                logger.debug("Got userid from username - "+info["data"][0]["id"])
             else:
                 return "banned"
-        except requests.exceptions.RequestException:
-            if self.mode == 1:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
+        except requests.exceptions.RequestException as e:
+            logger.debug("Error in get_id: " + e)
         
         return info["data"][0]["id"]
 
@@ -89,17 +95,15 @@ class gensingle():
                         secreturl = self.find_anipreview(info['data'][x]['id'])
                         if secreturl != "":
                             fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
-                            if self.mode == 1:
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+                            logger.debug("Found link "+ fullurl)
                             if info['data'][x]['type'] == 'archive':
                                 values = info['data'][x]['created_at'] + " - " + info['data'][x]['title'] + " - " + info['data'][x]['url'] + " - " + fullurl + "\n"
                                 memefile.write(values)
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
+                                logger.info("Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
                         else:
-                            if self.mode==1:
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No animated preview available at the moment for "+ str(self.username) + ".")
+                            logger.debug("No animated preview available at the moment for "+ str(self.username) + ".")
             else:
-                 print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error.")
+                 logger.error("HTTP error.")
                 
 class genmuted():
     def __init__(self, url):
@@ -153,19 +157,18 @@ class genmuted():
         open('index-dvr-muted.m3u8','w').write('\n'.join(lines))
 
 class vodthread(threading.Thread):
-    def __init__(self, username, quality, subonly):
+    def __init__(self, username, quality, subonly, refreshtime):
         threading.Thread.__init__(self)
         # global configuration
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
         # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
         self.oauth_token = client_twitch_oauth.token
-        self.refresh = config.refresh_time
+        self.refresh = refreshtime
         
         # user configuration
         self.username = username
         self.quality = quality
         self.subonly = subonly
-        self.mode = config.debug_mode
         self.old_status = 0
         self.user_id = None
         self.user_id = self.get_id()
@@ -236,13 +239,11 @@ class vodthread(threading.Thread):
             r.raise_for_status()
             info = r.json()
             if info['data'] != []:
-                if self.mode == 1:
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+                logger.debug("Got userid from username - "+info["data"][0]["id"])
             else:
                 return "banned"
-        except requests.exceptions.RequestException:
-            if self.mode == 1:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
+        except requests.exceptions.RequestException as e:
+            logger.debug("Error in get_id:" + e)
         
         return info["data"][0]["id"]
 
@@ -260,7 +261,6 @@ class vodthread(threading.Thread):
             if status == 0:
                 for x in range(len(info['data'])-1, -1, -1):
                     m3u8check = False
-                    time.sleep(1.5)
                     if self.subonly == False:
                         try:
                             streams = streaml.streams(info['data'][x]['url'])
@@ -269,18 +269,17 @@ class vodthread(threading.Thread):
                             cursor.execute('SELECT * FROM vods WHERE vodurl=?', (streams[self.quality].url,))
                             if cursor.fetchone() is None:
                                 m3u8check = True
-                            if self.mode == 1:
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
+                            logger.debug("Found link "+ streams[self.quality].url)
                             if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
                                 values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
                                 cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
+                                logger.info("Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
                             if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
                                 values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
                                 cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
-                        except streamlink.exceptions.PluginError:
-                            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
+                                logger.info("Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
+                        except streamlink.exceptions.PluginError as e:
+                            logger.error("Streamlink error: "+e)
                     else:
                         secreturl = self.find_anipreview(info['data'][x]['id'])
                         if secreturl != "":
@@ -288,39 +287,34 @@ class vodthread(threading.Thread):
                             cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
                             if cursor.fetchone() is None:
                                 m3u8check = True
-                            if self.mode == 1:
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+                            logger.debug("Found link "+ fullurl)
                             if m3u8check and info['data'][x]['type'] == 'archive':
                                 values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
                                 cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
+                                logger.info("Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
                         else:
-                            if self.mode==1:
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+                            logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
                     conn.commit()
             else:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
+                logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
         else:
-            if self.mode == 1:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
+            logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
 
     def loopcheck(self):
-        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
+        logger.info("Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
         while True:
             status = self.check_online()
             if status == 2:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                logger.error("Username not found. Invalid username or typo.")
                 time.sleep(self.refresh)
             elif status == 3:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
+                logger.error("Unexpected error.")
                 time.sleep(self.refresh)
             elif status == 1:
-                if self.mode == 1:
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
+                logger.debug(str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
                 time.sleep(self.refresh)
             elif status == 0:
-                if self.mode == 1:
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
+                logger.debug(str(self.username)+" online. Fetching vods.")
                 
                 # start streamlink process
                 self.vodchecker()
@@ -329,17 +323,16 @@ class vodthread(threading.Thread):
                 time.sleep(self.refresh)
 
 class launcher():
-    def __init__(self):
-        self.refresh = config.refresh_time
-        self.mode = config.debug_mode
+    def __init__(self, refreshtime):
+        self.refresh = refreshtime
         self.threads = []
 
     def run(self):
         # make sure the interval to check user availability is not less than 15 seconds
         if(self.refresh < 15):
-            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Check interval should not be lower than 15 seconds.")
+            logger.warning("Check interval should not be lower than 15 seconds.")
             self.refresh = 15
-            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"System set check interval to 15 seconds.")
+            logger.warning("System set check interval to 15 seconds.")
         with open("stream_list.json") as f:
             stream_list = json.load(f)
         username_str = ""
@@ -354,10 +347,10 @@ class launcher():
                 username_str = username_str + stream['username']
             else:
                 username_str = username_str + stream['username'] + ", "
-        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
+        logger.info("Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         i=1
         for stream in stream_list['list']:
-            thread = vodthread(stream['username'], stream['quality'], stream['subonly'])
+            thread = vodthread(stream['username'], stream['quality'], stream['subonly'], self.refresh)
             thread.daemon = True
             thread.name =  str(i)+"-"+ stream['username'] + "-thread"
             self.threads.append(thread)
@@ -370,29 +363,60 @@ class launcher():
                 if t.is_alive() != True:
                     n_in_list = t.name[:1]
                     n_in_list = int(n_in_list) - 1
-                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'])
+                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'], self.refresh)
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Thread "+t.name+" has crashed unexpectedly. Relaunching.")
+                    logger.warning("Thread "+t.name+" has crashed unexpectedly. Relaunching.")
                     thread.start()
                     
 def main(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
-    parser.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a sqlite db.", action="store_true")
-    parser.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
+    group.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a sqlite db. Default refresh time is 60 seconds.", nargs='?',type=int, const=60)
+    parser.add_argument("--verbose", "-v", help="Changes logging to verbose.", action="store_true")
+    group.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(0)
     args = parser.parse_args()
-    if args.crawl == True:
-        twitch_launcher = launcher()
+    if args.crawl:
+        if args.verbose:
+            consoleHandler.setLevel(logging.DEBUG)
+            fileHandler.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        else:
+            consoleHandler.setLevel(logging.INFO)
+            fileHandler.setLevel(logging.INFO)
+            logger.setLevel(logging.INFO)
+        logger.debug("Launching crawl mode.")
+        global streaml
+        streaml = streamlink.Streamlink()
+        twitch_launcher = launcher(args.crawl)
         twitch_launcher.run()
     if args.single:
+        if args.verbose:
+            consoleHandler.setLevel(logging.DEBUG)
+            fileHandler.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        else:
+            consoleHandler.setLevel(logging.INFO)
+            fileHandler.setLevel(logging.INFO)
+            logger.setLevel(logging.INFO)
+        logger.debug("Launching single mode.")
         twitch_launcher = gensingle(args.single)
         twitch_launcher.run()
     if args.genmuted:
+        if args.verbose:
+            consoleHandler.setLevel(logging.DEBUG)
+            fileHandler.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        else:
+            consoleHandler.setLevel(logging.INFO)
+            fileHandler.setLevel(logging.INFO)
+            logger.setLevel(logging.INFO)
+        logger.debug("Launching genmuted mode.")
         twitch_launcher = genmuted(args.genmuted)
         twitch_launcher.run()
 

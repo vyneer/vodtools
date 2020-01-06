@@ -138,3 +138,5 @@ meme.py
 *.m3u8
 buffer.txt
 *.db
+*.db-journal
+*.log
