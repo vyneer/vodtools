@@ -11,16 +11,27 @@ import time
 import json
 import sys
 import datetime
-import config
 import client_twitch_oauth
 import threading
 import argparse
 import m3u8
 import re
+import logging
 
 scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
 creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
 client = gspread.authorize(creds)
+
+logger = logging.getLogger(__name__)
+logformat = logging.Formatter('[%(levelname)s][%(threadName)s][%(asctime)s] %(message)s')
+
+fileHandler = logging.FileHandler("vodtools.log")
+fileHandler.setFormatter(logformat)
+logger.addHandler(fileHandler)
+
+consoleHandler = logging.StreamHandler(sys.stdout)
+consoleHandler.setFormatter(logformat)
+logger.addHandler(consoleHandler)
 
 class gensingle():
     def __init__(self, username):
@@ -30,7 +41,6 @@ class gensingle():
         
         # user configuration
         self.username = username
-        self.mode = config.debug_mode
         self.user_id = None
         self.user_id = self.get_id()
         streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
@@ -56,13 +66,11 @@ class gensingle():
             r.raise_for_status()
             info = r.json()
             if info['data'] != []:
-                if self.mode == 1:
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+                    logger.debug("Got userid from username - "+info["data"][0]["id"])
             else:
                 return "banned"
-        except requests.exceptions.RequestException:
-            if self.mode == 1:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
+        except requests.exceptions.RequestException as e:
+            logger.debug("Error in get_id: " + str(e))
         
         return info["data"][0]["id"]
 
@@ -92,17 +100,15 @@ class gensingle():
                         secreturl = self.find_anipreview(info['data'][x]['id'])
                         if secreturl != "":
                             fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
-                            if self.mode == 1:
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+                            logger.debug("Found link "+ fullurl)
                             if info['data'][x]['type'] == 'archive':
                                 values = info['data'][x]['created_at'] + " - " + info['data'][x]['title'] + " - " + info['data'][x]['url'] + " - " + fullurl + "\n"
                                 memefile.write(values)
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
+                                logger.info("Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
                         else:
-                            if self.mode==1:
-                                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No animated preview available at the moment for "+ str(self.username) + ".")
+                            logger.debug("No animated preview available at the moment for "+ str(self.username) + ".")
             else:
-                 print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error.")
+                 logger.info("HTTP error.")
                 
 class sheetmaker():
     def __init__(self, makesheet):
@@ -112,7 +118,7 @@ class sheetmaker():
     def run(self):
         kek = client.create(self.sheetname)
         kek.share(self.shareemail, perm_type='user', role='writer')
-        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Created the spreadsheet. Check your email for the URL.")
+        logger.info("Created the spreadsheet. Check your email for the URL.")
     
 class genmuted():
     def __init__(self, url):
@@ -179,7 +185,6 @@ class vodthread(threading.Thread):
         self.quality = quality
         self.subonly = subonly
         self.gsheets_url = gsheets_url
-        self.mode = config.debug_mode
         self.old_status = 0
         self.user_id = None
         self.user_id = self.get_id()
@@ -250,13 +255,11 @@ class vodthread(threading.Thread):
             r.raise_for_status()
             info = r.json()
             if info['data'] != []:
-                if self.mode == 1:
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Got userid from username - "+info["data"][0]["id"])
+                logger.debug("Got userid from username - "+info["data"][0]["id"])
             else:
                 return "banned"
-        except requests.exceptions.RequestException:
-            if self.mode == 1:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Error in get_id.")
+        except requests.exceptions.RequestException as e:
+            logger.debug("Error in get_id: "+str(e))
         
         return info["data"][0]["id"]
 
@@ -278,60 +281,54 @@ class vodthread(threading.Thread):
                                         self.quality = "best"
                                     if sheet.findall(streams[self.quality].url) == []:
                                         m3u8check = True
-                                    if self.mode == 1:
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ streams[self.quality].url)
+                                    logger.debug("Found link "+ streams[self.quality].url)
                                     if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
                                         values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
                                         sheet.append_row(values)
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
+                                        logger.info("Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
                                     if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
                                         values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
                                         sheet.append_row(values)
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
-                                except streamlink.exceptions.PluginError:
-                                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Streamlink error.")
+                                        logger.info("Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
+                                except streamlink.exceptions.PluginError as e:
+                                    logger.error("Streamlink error: " + str(e))
                             else:
                                 secreturl = self.find_anipreview(info['data'][x]['id'])
                                 if secreturl != "":
                                     fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
                                     if sheet.findall(fullurl) == []:
                                         m3u8check = True
-                                    if self.mode == 1:
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Found link "+ fullurl)
+                                    logger.debug("Found link "+ fullurl)
                                     if m3u8check and info['data'][x]['type'] == 'archive':
                                         values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
                                         sheet.append_row(values)
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
+                                        logger.info("Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
                                 else:
-                                    if self.mode==1:
-                                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
                     else:
-                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] HTTP error, trying again in " + str(self.refresh) + " seconds.")
+                        logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
                 else:
-                    if self.mode == 1:
-                        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] No new VODs, checking again in " + str(self.refresh) + " seconds.")
+                    logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
             except gspread.exceptions.APIError as e:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable. Code: " + str(e))
+                logger.error("GSpread error: The service is currently unavailable. Code: " + str(e))
         except gspread.exceptions.APIError as e:
-            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] GSpread error: The service is currently unavailable. Code: " + str(e))
+            logger.error("GSpread error: The service is currently unavailable. Code: " + str(e))
 
     def loopcheck(self):
-        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
+        logger.info("Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
         while True:
             status = self.check_online()
             if status == 2:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Username not found. Invalid username or typo.")
+                logger.error("Username not found. Invalid username or typo.")
                 time.sleep(self.refresh)
             elif status == 3:
-                print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Unexpected error.")
+                logger.error("Unexpected error.")
                 time.sleep(self.refresh)
             elif status == 1:
-                if self.mode == 1:
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
+                logger.debug(str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
                 time.sleep(self.refresh)
             elif status == 0:
-                if self.mode == 1:
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+str(self.username)+" online. Fetching vods.")
+                logger.debug(str(self.username)+" online. Fetching vods.")
                 
                 # start streamlink process
                 client.login()
@@ -343,15 +340,14 @@ class vodthread(threading.Thread):
 class launcher():
     def __init__(self, refreshtime):
         self.refresh = refreshtime
-        self.mode = config.debug_mode
         self.threads = []
 
     def run(self):
         # make sure the interval to check user availability is not less than 15 seconds
         if(self.refresh < 15):
-            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Check interval should not be lower than 15 seconds.")
+            logger.warning("Check interval should not be lower than 15 seconds.")
             self.refresh = 15
-            print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"System set check interval to 15 seconds.")
+            logger.info("System set check interval to 15 seconds.")
         with open("stream_list.json") as f:
             stream_list = json.load(f)
         username_str = ""
@@ -366,7 +362,7 @@ class launcher():
                 username_str = username_str + stream['username']
             else:
                 username_str = username_str + stream['username'] + ", "
-        print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
+        logger.info("Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         i=1
         for stream in stream_list['list']:
             thread = vodthread(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'], self.refresh)
@@ -386,7 +382,7 @@ class launcher():
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
-                    print("["+threading.current_thread().name+"]"+"["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] Thread "+t.name+" has crashed unexpectedly. Relaunching.")
+                    logger.error("Thread "+t.name+" has crashed unexpectedly. Relaunching.")
                     thread.start()
                     
 def main(argv):
@@ -396,22 +392,59 @@ def main(argv):
     group.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet. Default refresh time is 60 seconds.", nargs='?',type=int, const=60)
     group.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
     group.add_argument("--makesheet", "-ms", nargs=2, metavar=('SHEET_NAME','SHARE_EMAIL'), help="Creates and shares a spreadsheet.", type=str)
+    parser.add_argument("--verbose", "-v", help="Changes logging to verbose.", action="store_true")
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(0)
     args = parser.parse_args()
     if args.makesheet:
+        if args.verbose:
+            consoleHandler.setLevel(logging.DEBUG)
+            fileHandler.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        else:
+            consoleHandler.setLevel(logging.INFO)
+            fileHandler.setLevel(logging.INFO)
+            logger.setLevel(logging.INFO)
+        logger.info("Launching makesheet mode.")
         twitch_launcher = sheetmaker(args.makesheet)
         twitch_launcher.run()
     if args.crawl:
+        if args.verbose:
+            consoleHandler.setLevel(logging.DEBUG)
+            fileHandler.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        else:
+            consoleHandler.setLevel(logging.INFO)
+            fileHandler.setLevel(logging.INFO)
+            logger.setLevel(logging.INFO)
+        logger.info("Launching crawl mode.")
         global streaml
         streaml = streamlink.Streamlink()
         twitch_launcher = launcher(args.crawl)
         twitch_launcher.run()
     if args.single:
+        if args.verbose:
+            consoleHandler.setLevel(logging.DEBUG)
+            fileHandler.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        else:
+            consoleHandler.setLevel(logging.INFO)
+            fileHandler.setLevel(logging.INFO)
+            logger.setLevel(logging.INFO)
+        logger.info("Launching single mode.")
         twitch_launcher = gensingle(args.single)
         twitch_launcher.run()
     if args.genmuted:
+        if args.verbose:
+            consoleHandler.setLevel(logging.DEBUG)
+            fileHandler.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        else:
+            consoleHandler.setLevel(logging.INFO)
+            fileHandler.setLevel(logging.INFO)
+            logger.setLevel(logging.INFO)
+        logger.info("Launching genmuted mode.")
         twitch_launcher = genmuted(args.genmuted)
         twitch_launcher.run()
 
