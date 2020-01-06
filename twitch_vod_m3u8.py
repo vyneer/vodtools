@@ -179,7 +179,7 @@ class vodthread(threading.Thread):
         # 1: offline, 
         # 2: not found, 
         # 3: error
-        url = 'https://api.twitch.tv/helix/videos?user_id=' + self.user_id
+        url = 'https://api.twitch.tv/helix/videos?user_id=' + self.user_id + "&first=100"
         info = None
         try:
             r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)

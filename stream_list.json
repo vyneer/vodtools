@@ -1,24 +1,9 @@
 {
 	"list":[
 		{
-			"username" : "pedguin",
+			"username" : "arianina",
 			"quality" : "720p",
 			"subonly" : true
-		},
-		{
-			"username" : "trihex",
-			"quality" : "720p",
-			"subonly" : true
-		},
-		{
-			"username" : "mrmouton",
-			"quality" : "720p",
-			"subonly" : false
-		},
-		{
-			"username" : "gamesdonequick",
-			"quality" : "720p",
-			"subonly" : false
 		}
 	]
 }
