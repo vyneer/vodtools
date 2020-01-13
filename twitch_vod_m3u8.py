@@ -43,7 +43,6 @@ class gensingle():
         self.username = username
         self.user_id = None
         self.user_id = self.get_id()
-        streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def find_anipreview(self, vod_id):
         url = 'https://api.twitch.tv/kraken/videos/' + vod_id
@@ -103,7 +102,7 @@ class gensingle():
                             logger.debug("Found link "+ fullurl)
                             if info['data'][x]['type'] == 'archive':
                                 values = info['data'][x]['created_at'] + " - " + info['data'][x]['title'] + " - " + info['data'][x]['url'] + " - " + fullurl + "\n"
-                                memefile.write(values)
+                                memefile.write(values.encode('utf-8'))
                                 logger.info("Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
                         else:
                             logger.debug("No animated preview available at the moment for "+ str(self.username) + ".")
