@@ -98,7 +98,7 @@ class gensingle():
                             logger.debug("Found link "+ fullurl)
                             if info['data'][x]['type'] == 'archive':
                                 values = info['data'][x]['created_at'] + " - " + info['data'][x]['title'] + " - " + info['data'][x]['url'] + " - " + fullurl + "\n"
-                                memefile.write(values)
+                                memefile.write(values.encode('utf-8'))
                                 logger.info("Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
                         else:
                             logger.debug("No animated preview available at the moment for "+ str(self.username) + ".")
