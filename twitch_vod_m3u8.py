@@ -185,7 +185,6 @@ class vodthread(threading.Thread):
         self.subonly = subonly
         self.gsheets_url = gsheets_url
         self.old_status = 0
-        self.user_id = None
         self.user_id = self.get_id()
         streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
@@ -268,8 +267,8 @@ class vodthread(threading.Thread):
             status, info = self.check_videos()
             client.login()
             try:
-                if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
-                    if status == 0:
+                if status == 0:
+                    if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
                         for x in range(len(info['data'])-1, -1, -1):
                             m3u8check = False
                             time.sleep(1.5)
@@ -305,9 +304,9 @@ class vodthread(threading.Thread):
                                 else:
                                     logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
                     else:
-                        logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
+                        logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
                 else:
-                    logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
+                    logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
             except gspread.exceptions.APIError as e:
                 logger.error("GSpread error: The service is currently unavailable. Code: " + str(e))
         except gspread.exceptions.APIError as e:
