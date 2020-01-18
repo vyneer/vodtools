@@ -170,7 +170,6 @@ class vodthread(threading.Thread):
         self.quality = quality
         self.subonly = subonly
         self.old_status = 0
-        self.user_id = None
         self.user_id = self.get_id()
         streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
@@ -256,9 +255,9 @@ class vodthread(threading.Thread):
         conn = sqlite3.connect(self.username + "_vods.db")
         status, info = self.check_videos()
         cursor=conn.cursor()
-        cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
-        if info != None and info['data'] != [] and cursor.fetchone() is None:
-            if status == 0:
+        if status == 0:
+            cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
+            if info != None and info['data'] != [] and cursor.fetchone() is None:
                 for x in range(len(info['data'])-1, -1, -1):
                     m3u8check = False
                     if self.subonly == False:
@@ -296,9 +295,9 @@ class vodthread(threading.Thread):
                             logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
                     conn.commit()
             else:
-                logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
+                logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
         else:
-            logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
+            logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
 
     def loopcheck(self):
         logger.info("Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
