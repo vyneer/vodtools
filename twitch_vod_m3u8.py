@@ -62,12 +62,11 @@ class gensingle():
             info = r.json()
             if info['data'] != []:
                 logger.debug("Got userid from username - "+info["data"][0]["id"])
+                return info["data"][0]["id"]
             else:
                 return "banned"
         except requests.exceptions.RequestException as e:
             logger.debug("Error in get_id: " + str(e))
-        
-        return info["data"][0]["id"]
 
     def check_videos(self):
         # 0: online, 
@@ -239,12 +238,11 @@ class vodthread(threading.Thread):
             info = r.json()
             if info['data'] != []:
                 logger.debug("Got userid from username - "+info["data"][0]["id"])
+                return info["data"][0]["id"]
             else:
                 return "banned"
         except requests.exceptions.RequestException as e:
             logger.debug("Error in get_id: " + str(e))
-        
-        return info["data"][0]["id"]
 
     def vodchecker(self):
         path = pathlib.Path(self.username + "_vods.db")
