@@ -29,54 +29,66 @@ consoleHandler = logging.StreamHandler(sys.stdout)
 consoleHandler.setFormatter(logformat)
 logger.addHandler(consoleHandler)
 
-class gensingle():
-    def __init__(self, username):
-        self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
-        # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
-        self.oauth_token = client_twitch_oauth.token
-        
-        # user configuration
-        self.username = username
-        self.user_id = None
-        self.user_id = self.get_id()
+class ttvfunctions():
+    def check_online(self, username, client_id):
+        # 0: online, 
+        # 1: offline, 
+        # 2: not found, 
+        # 3: error
+        url = 'https://api.twitch.tv/kraken/streams/' + username
+        info = None
+        status = 3
+        try:
+            r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
+            r.raise_for_status()
+            info = r.json()
+            if info['stream'] == None:
+                status = 1
+            else:
+                status = 0
+        except requests.exceptions.RequestException as e:
+            if e.response:
+                if e.response.reason == 'Not Found' or e.response.reason == 'Unprocessable Entity':
+                    status = 2
 
-    def find_anipreview(self, vod_id):
+        return status
+    
+    def find_anipreview(self, vod_id, client_id):
         url = 'https://api.twitch.tv/kraken/videos/' + vod_id
         info = None
         try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+            r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            status = 0
-        except requests.exceptions.RequestException:
-            status = 1
+        except requests.exceptions.RequestException as e:
+            logger.debug("Error in find_anipreview: " + str(e))
         result = re.findall(r"(?<=\/)[^\/]+(?=\/)", info['animated_preview_url'])
         return result[1]
 
-    def get_id(self):
-        url = 'https://api.twitch.tv/helix/users?login=' + self.username
+    def get_id(self, username, client_id):
+        url = 'https://api.twitch.tv/helix/users?login=' + username
         info = None
         try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+            r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
             if info['data'] != []:
-                logger.debug("Got userid from username - "+info["data"][0]["id"])
-                return info["data"][0]["id"]
+                    logger.debug("Got userid from username - "+info["data"][0]["id"])
+                    return info["data"][0]["id"]
             else:
                 return "banned"
         except requests.exceptions.RequestException as e:
             logger.debug("Error in get_id: " + str(e))
 
-    def check_videos(self):
+    def check_videos(self, user_id, client_id):
         # 0: online, 
         # 1: offline, 
         # 2: not found, 
         # 3: error
-        url = 'https://api.twitch.tv/helix/videos?user_id=' + self.user_id + "&first=100"
+        url = 'https://api.twitch.tv/helix/videos?user_id=' + user_id + "&first=100"
         info = None
         try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
+            r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
             status = 0
@@ -85,13 +97,23 @@ class gensingle():
 
         return status, info
 
+class gensingle():
+    def __init__(self, username):
+        self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
+        # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
+        self.oauth_token = client_twitch_oauth.token
+        
+        # user configuration
+        self.username = username
+        self.user_id = ttvfunctions().get_id(self.username, self.client_id)
+
     def run(self):
-        status, info = self.check_videos()
+        status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
         if info != None and info['data'] != []:
             if status == 0:
                 with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "w") as memefile:
                     for x in range(len(info['data'])-1, -1, -1):
-                        secreturl = self.find_anipreview(info['data'][x]['id'])
+                        secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
                         if secreturl != "":
                             fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
                             logger.debug("Found link "+ fullurl)
@@ -169,80 +191,11 @@ class vodthread(threading.Thread):
         self.quality = quality
         self.subonly = subonly
         self.old_status = 0
-        self.user_id = self.get_id()
+        self.user_id = ttvfunctions().get_id(self.username, self.client_id)
         streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def run(self):
         self.loopcheck()
-
-    def check_videos(self):
-        # 0: online, 
-        # 1: offline, 
-        # 2: not found, 
-        # 3: error
-        url = 'https://api.twitch.tv/helix/videos?user_id=' + self.user_id + "&first=100"
-        info = None
-        try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
-            r.raise_for_status()
-            info = r.json()
-            status = 0
-        except requests.exceptions.RequestException:
-            status = 1
-
-        return status, info
-
-    def find_anipreview(self, vod_id):
-        url = 'https://api.twitch.tv/kraken/videos/' + vod_id
-        info = None
-        try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
-            r.raise_for_status()
-            info = r.json()
-            status = 0
-        except requests.exceptions.RequestException:
-            status = 1
-
-        result = re.findall(r"(?<=\/)[^\/]+(?=\/)", info['animated_preview_url'])
-        return result[1]
-
-    def check_online(self):
-        # 0: online, 
-        # 1: offline, 
-        # 2: not found, 
-        # 3: error
-        url = 'https://api.twitch.tv/kraken/streams/' + self.username
-        info = None
-        status = 3
-        try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
-            r.raise_for_status()
-            info = r.json()
-            if info['stream'] == None:
-                status = 1
-            else:
-                status = 0
-        except requests.exceptions.RequestException as e:
-            if e.response:
-                if e.response.reason == 'Not Found' or e.response.reason == 'Unprocessable Entity':
-                    status = 2
-
-        return status
-
-    def get_id(self):
-        url = 'https://api.twitch.tv/helix/users?login=' + self.username
-        info = None
-        try:
-            r = requests.get(url, headers = {"Client-ID" : self.client_id}, timeout = 15)
-            r.raise_for_status()
-            info = r.json()
-            if info['data'] != []:
-                logger.debug("Got userid from username - "+info["data"][0]["id"])
-                return info["data"][0]["id"]
-            else:
-                return "banned"
-        except requests.exceptions.RequestException as e:
-            logger.debug("Error in get_id: " + str(e))
 
     def vodchecker(self):
         path = pathlib.Path(self.username + "_vods.db")
@@ -251,7 +204,7 @@ class vodthread(threading.Thread):
             cursor=conn.cursor()
             cursor.execute("""CREATE TABLE vods (timecode text, title text, twitchurl text, vodurl text, type text)""")
         conn = sqlite3.connect(self.username + "_vods.db")
-        status, info = self.check_videos()
+        status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
         cursor=conn.cursor()
         if status == 0:
             cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
@@ -278,7 +231,7 @@ class vodthread(threading.Thread):
                         except streamlink.exceptions.PluginError as e:
                             logger.error("Streamlink error: "+str(e))
                     else:
-                        secreturl = self.find_anipreview(info['data'][x]['id'])
+                        secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
                         if secreturl != "":
                             fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
                             cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
@@ -300,7 +253,7 @@ class vodthread(threading.Thread):
     def loopcheck(self):
         logger.info("Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
         while True:
-            status = self.check_online()
+            status = ttvfunctions().check_online(self.username, self.client_id)
             if status == 2:
                 logger.error("Username not found. Invalid username or typo.")
                 time.sleep(self.refresh)
