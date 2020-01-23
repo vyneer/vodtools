@@ -139,3 +139,4 @@ meme.py
 *.db
 *.db-journal
 *.txt
+*.log
