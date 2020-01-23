@@ -136,6 +136,6 @@ client_twitch_oauth.py
 meme.py
 .vscode
 *.m3u8
-buffer.txt
 *.db
 *.db-journal
+*.txt
