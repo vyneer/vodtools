@@ -315,8 +315,8 @@ class launcher():
             time.sleep(1)
             for t in self.threads:
                 if t.is_alive() != True:
-                    n_in_list = t.name[:1]
-                    n_in_list = int(n_in_list) - 1
+                    match = re.findall(r"^\d+", t.name)
+                    n_in_list = int(match[0]) - 1
                     thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'], self.refresh)
                     thread.daemon = True
                     thread.name = t.name
