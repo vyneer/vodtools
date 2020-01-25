@@ -60,10 +60,14 @@ class ttvfunctions():
             r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
+            if info['animated_preview_url'] != [] or None:
+                result = re.findall(r"(?<=\/)[^\/]+(?=\/)", info['animated_preview_url'])
+                return result[1]
+            else:
+                return ""
         except requests.exceptions.RequestException as e:
             logger.debug("Error in find_anipreview: " + str(e))
-        result = re.findall(r"(?<=\/)[^\/]+(?=\/)", info['animated_preview_url'])
-        return result[1]
+        
 
     def get_id(self, username, client_id):
         url = 'https://api.twitch.tv/helix/users?login=' + username
@@ -72,7 +76,7 @@ class ttvfunctions():
             r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            if info['data'] != []:
+            if info['data'] != [] or None:
                     logger.debug("Got userid from username - "+info["data"][0]["id"])
                     return info["data"][0]["id"]
             else:
