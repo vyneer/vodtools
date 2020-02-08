@@ -212,46 +212,49 @@ class vodthread(threading.Thread):
             status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
             cursor=conn.cursor()
             if status == 0:
-                cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
-                if info != None and info['data'] != [] and cursor.fetchone() is None:
-                    for x in range(len(info['data'])-1, -1, -1):
-                        m3u8check = False
-                        if self.subonly == False:
-                            try:
-                                streams = streaml.streams(info['data'][x]['url'])
-                                if self.quality not in streams:
-                                    self.quality = "best"
-                                cursor.execute('SELECT * FROM vods WHERE vodurl=?', (streams[self.quality].url,))
-                                if cursor.fetchone() is None:
-                                    m3u8check = True
-                                logger.debug("Found link "+ streams[self.quality].url)
-                                if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                    values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
-                                    cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
-                                    logger.info("Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
-                                if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                    values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
-                                    cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
-                                    logger.info("Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
-                            except streamlink.exceptions.PluginError as e:
-                                logger.error("Streamlink error: "+str(e))
-                        else:
-                            secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
-                            if secreturl != "":
-                                fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
-                                cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
-                                if cursor.fetchone() is None:
-                                    m3u8check = True
-                                logger.debug("Found link "+ fullurl)
-                                if m3u8check and info['data'][x]['type'] == 'archive':
-                                    values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
-                                    cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
-                                    logger.info("Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
+                if info != None and info['data'] != []:
+                    cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
+                    if cursor.fetchone() is None:
+                        for x in range(len(info['data'])-1, -1, -1):
+                            m3u8check = False
+                            if self.subonly == False:
+                                try:
+                                    streams = streaml.streams(info['data'][x]['url'])
+                                    if self.quality not in streams:
+                                        self.quality = "best"
+                                    cursor.execute('SELECT * FROM vods WHERE vodurl=?', (streams[self.quality].url,))
+                                    if cursor.fetchone() is None:
+                                        m3u8check = True
+                                    logger.debug("Found link "+ streams[self.quality].url)
+                                    if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
+                                        values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
+                                        cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                        logger.info("Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
+                                    if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
+                                        values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
+                                        cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                        logger.info("Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
+                                except streamlink.exceptions.PluginError as e:
+                                    logger.error("Streamlink error: "+str(e))
                             else:
-                                logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
-                        conn.commit()
+                                secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
+                                if secreturl != "":
+                                    fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
+                                    cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
+                                    if cursor.fetchone() is None:
+                                        m3u8check = True
+                                    logger.debug("Found link "+ fullurl)
+                                    if m3u8check and info['data'][x]['type'] == 'archive':
+                                        values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
+                                        cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                        logger.info("Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
+                                else:
+                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+                            conn.commit()
+                    else:
+                        logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
                 else:
-                    logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
+                    logger.debug("No VODs exist, checking again in " + str(self.refresh) + " seconds.")
             else:
                 logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
         else:
