@@ -265,7 +265,7 @@ class vodthread(threading.Thread):
                         logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
                 except gspread.exceptions.APIError as e:
                     logger.error("GSpread error: The service is currently unavailable. Code: " + str(e))
-            except gspread.exceptions.APIError as e:
+            except Exception as e:
                 logger.error("GSpread error: The service is currently unavailable. Code: " + str(e))
         else:
             logger.debug("Couldn't find a user_id.")
