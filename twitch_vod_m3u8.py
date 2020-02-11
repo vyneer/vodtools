@@ -118,7 +118,7 @@ class gensingle():
                 with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "w") as memefile:
                     for x in range(len(info['data'])-1, -1, -1):
                         secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
-                        if secreturl != "":
+                        if secreturl != "" or None:
                             fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
                             logger.debug("Found link "+ fullurl)
                             if info['data'][x]['type'] == 'archive':
@@ -238,7 +238,7 @@ class vodthread(threading.Thread):
                                     logger.error("Streamlink error: "+str(e))
                             else:
                                 secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
-                                if secreturl != "":
+                                if secreturl != "" or None:
                                     fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
                                     cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
                                     if cursor.fetchone() is None:
