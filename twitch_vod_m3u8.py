@@ -119,14 +119,14 @@ class gensingle():
         status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
         if info != None and info['data'] != []:
             if status == 0:
-                with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "w") as memefile:
+                with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "wb") as memefile:
                     for x in range(len(info['data'])-1, -1, -1):
                         secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
                         if secreturl != "" or None:
                             fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
                             logger.debug("Found link "+ fullurl)
                             if info['data'][x]['type'] == 'archive':
-                                values = info['data'][x]['created_at'] + " - " + info['data'][x]['title'] + " - " + info['data'][x]['url'] + " - " + fullurl + "\n"
+                                values = str(info['data'][x]['created_at'] + " - " + info['data'][x]['title'] + " - " + info['data'][x]['url'] + " - " + fullurl + "\n")
                                 memefile.write(values.encode('utf-8'))
                                 logger.info("Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
                         else:
