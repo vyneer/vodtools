@@ -213,7 +213,6 @@ class vodthread(threading.Thread):
                 status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
                 cursor=conn.cursor()
                 if status == 0:
-                    raise TypeError
                     if info != None and info['data'] != []:
                         cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
                         if cursor.fetchone() is None:
