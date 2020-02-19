@@ -317,6 +317,18 @@ class launcher():
             i+=1
             thread.start()
             time.sleep(2)
+        while True:
+            time.sleep(1)
+            for t in self.threads:
+                if t.is_alive() != True:
+                    match = re.findall(r"^\d+", t.name)
+                    n_in_list = int(match[0]) - 1
+                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'], self.refresh)
+                    thread.daemon = True
+                    thread.name = t.name
+                    self.threads.append(thread)
+                    logger.error("Thread "+t.name+" has crashed unexpectedly. Relaunching.")
+                    thread.start()
                     
 def main(argv):
     parser = argparse.ArgumentParser()
