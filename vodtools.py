@@ -317,7 +317,10 @@ class vodthread(threading.Thread):
             logger.error("Caugth a TypeError in vodthread: " + str(e))
 
     def loopcheck(self):
-        logger.info("Checking " + str(self.username) +  " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
+        if self.gsheets_url:
+            logger.info("Checking " + str(self.username) +  " every " + str(self.refresh) + " seconds. Adding links with " + str(self.quality) + " quality to the Google Spreadsheet.")
+        else:
+            logger.info("Checking " + str(self.username) +  " every " + str(self.refresh) + " seconds. Adding links with " + str(self.quality) + " quality to the local SQLite database.")
         while True:
             self.user_id = ttvfunctions().get_id(self.username, self.client_id)
             if self.user_id == None:
