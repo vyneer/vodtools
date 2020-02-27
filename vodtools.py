@@ -248,71 +248,64 @@ class vodthread(threading.Thread):
         self.loopcheck()
 
     def vodcheckerSheets(self):
-        if self.user_id != None:
-            try:
-                sheet = self.client.open_by_url(self.gsheets_url).sheet1
-                status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
-                self.client.login()
-                try:
-                    if status == 0:
-                        if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
-                            for x in range(len(info['data'])-1, -1, -1):
-                                time.sleep(1.5)
-                                fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
-                                if fullurl != None and fullurl != "notarchive":
-                                    if sheet.findall(fullurl) == []:
-                                        sheet.append_row(values)
-                                        logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ info['data'][x]['url'] + " to the spreadsheet.")
-                                elif fullurl == "notarchive":
-                                    logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
-                                else:
-                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + info['data'][x]['url'] + ". Retrying later.")
+        try:
+            sheet = self.client.open_by_url(self.gsheets_url).sheet1
+            status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
+            self.client.login()
+            if status == 0:
+                if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
+                    for x in range(len(info['data'])-1, -1, -1):
+                        time.sleep(1.5)
+                        fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
+                        if fullurl != None and fullurl != "notarchive":
+                            if sheet.findall(fullurl) == []:
+                                sheet.append_row(values)
+                                logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ info['data'][x]['url'] + " to the spreadsheet.")
+                        elif fullurl == "notarchive":
+                            logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
                         else:
-                            logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
-                    else:
-                        logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
-                except gspread.exceptions.APIError as e:
-                    logger.error("GSpread error: The service is currently unavailable. Code: " + str(e))
-            except Exception as e:
-                logger.error("GSpread error: The service is currently unavailable. Code: " + str(e))
-        else:
-            logger.debug("Couldn't find a user_id.")
+                            logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + info['data'][x]['url'] + ". Retrying later.")
+                else:
+                    logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
+            else:
+                logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
+        except gspread.exceptions.APIError as e:
+            logger.error("GSpread error: APIError. Code: " + str(e))
+        except gspread.exceptions.GSpreadException as e:
+            logger.error("GSpread error: GSpreadException. Code: " + str(e))
 
     def vodcheckerLocal(self):
         try:
-            if self.user_id != None:
-                path = pathlib.Path(self.username + "_vods.db")
-                if path.exists() != True:
-                    conn = sqlite3.connect(self.username + "_vods.db")
-                    cursor=conn.cursor()
-                    cursor.execute("""CREATE TABLE vods (timecode text, title text, twitchurl text, vodurl text, type text)""")
+            path = pathlib.Path(self.username + "_vods.db")
+            if path.exists() != True:
                 conn = sqlite3.connect(self.username + "_vods.db")
-                status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
                 cursor=conn.cursor()
-                if status == 0:
-                    if info != None and info['data'] != []:
-                        cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
-                        if cursor.fetchone() is None:
-                            for x in range(len(info['data'])-1, -1, -1):
-                                fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
-                                if fullurl != None and fullurl != "notarchive":
-                                    cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
-                                    if cursor.fetchone() is None:
-                                        cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
-                                        logger.info("Added " + str(self.username) + "'s "+ self.quality +" VOD "+ info['data'][x]['url'] + " to the database.")
-                                elif fullurl == "notarchive":
-                                    logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
-                                else:
-                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + info['data'][x]['url'] + ". Retrying later.")
-                                conn.commit()
-                        else:
-                            logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
+                cursor.execute("""CREATE TABLE vods (timecode text, title text, twitchurl text, vodurl text, type text)""")
+            conn = sqlite3.connect(self.username + "_vods.db")
+            status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
+            cursor=conn.cursor()
+            if status == 0:
+                if info != None and info['data'] != []:
+                    cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
+                    if cursor.fetchone() is None:
+                        for x in range(len(info['data'])-1, -1, -1):
+                            fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
+                            if fullurl != None and fullurl != "notarchive":
+                                cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
+                                if cursor.fetchone() is None:
+                                    cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                    logger.info("Added " + str(self.username) + "'s "+ self.quality +" VOD "+ info['data'][x]['url'] + " to the database.")
+                            elif fullurl == "notarchive":
+                                logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
+                            else:
+                                logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + info['data'][x]['url'] + ". Retrying later.")
+                            conn.commit()
                     else:
-                        logger.debug("No VODs exist, checking again in " + str(self.refresh) + " seconds.")
+                        logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
                 else:
-                    logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
+                    logger.debug("No VODs exist, checking again in " + str(self.refresh) + " seconds.")
             else:
-                logger.debug("Couldn't find a user_id.")
+                logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
         except TypeError as e:
             logger.error("Caugth a TypeError in vodthread: " + str(e))
 
@@ -327,10 +320,10 @@ class vodthread(threading.Thread):
             if self.user_id == None:
                 if banned_bool == False:
                     logger.error("No ID found: check if " + self.username + " got banned.")
-                banned_bool == True
+                banned_bool = True
                 time.sleep(self.refresh)
             else:
-                banned_bool == False
+                banned_bool = False
                 status = ttvfunctions().check_online(self.username, self.client_id)
                 if status == 2:
                     logger.error("Username not found. Invalid username or typo.")
