@@ -317,6 +317,7 @@ class vodthread(threading.Thread):
             logger.error("Caugth a TypeError in vodthread: " + str(e))
 
     def loopcheck(self):
+        banned_bool = False
         if self.gsheets_url:
             logger.info("Checking " + str(self.username) +  " every " + str(self.refresh) + " seconds. Adding links with " + str(self.quality) + " quality to the Google Spreadsheet.")
         else:
@@ -324,9 +325,12 @@ class vodthread(threading.Thread):
         while True:
             self.user_id = ttvfunctions().get_id(self.username, self.client_id)
             if self.user_id == None:
-                logger.error("No ID found: check if " + self.username + " got banned.")
+                if banned_bool == False:
+                    logger.error("No ID found: check if " + self.username + " got banned.")
+                banned_bool == True
                 time.sleep(self.refresh)
             else:
+                banned_bool == False
                 status = ttvfunctions().check_online(self.username, self.client_id)
                 if status == 2:
                     logger.error("Username not found. Invalid username or typo.")
