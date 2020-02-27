@@ -3,6 +3,7 @@
 # original code is from https://slicktechies.com/how-to-watchrecord-twitch-streams-using-livestreamer/
 
 import gspread
+import os
 import streamlink
 import sqlite3
 import pathlib
@@ -121,6 +122,7 @@ class ttvfunctions():
                 return "notarchive", None
         else:
             return None, None
+
 class gensingle():
     def __init__(self, username):
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
@@ -162,6 +164,7 @@ class sheetmaker():
 class genmuted():
     def __init__(self, url):
         self.url=url
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
 
     def loadM3u8(self, m3u8url):
         def load_m3u8(url):
@@ -178,37 +181,54 @@ class genmuted():
             return {'videoUrls': videoUrls}
     
     def run(self):
-        yourl = self.url[:-14]
+        clean_url = self.url[:-14]
+
+        regex1 = re.findall(r"(?<=\/)[^\/]+(?=\/)", clean_url)
+
+        rel_path = "muted playlists"
+        abs_file_path = os.path.join(self.script_dir, rel_path)
+        orig_rel_path = "muted playlists\\" + regex1[1] + ".m3u8"
+        orig_abs_file_path = os.path.join(self.script_dir, orig_rel_path)
+        buf_rel_path = "muted playlists\\buffer.txt"
+        buf_abs_file_path = os.path.join(self.script_dir, buf_rel_path)
+        mut_rel_path = "muted playlists\\muted_" + regex1[1] + ".m3u8"
+        mut_abs_file_path = os.path.join(self.script_dir, mut_rel_path)
 
         r = requests.get(self.url, stream=True)
-        open("index-dvr.m3u8", "wb").write(r.content)
+        if os.path.exists(abs_file_path) == False:
+            os.mkdir(abs_file_path)
+        open(orig_abs_file_path, "wb").write(r.content)
+        logger.info("Downloaded the original/broken m3u8 to /muted playlists/" + regex1[1] + ".m3u8.")
 
-        tslinks = self.loadM3u8("index-dvr.m3u8")
+        tslinks = self.loadM3u8(self.url)
         i=0
 
-        with open("buffer.txt", "w") as f:
+        with open(buf_abs_file_path, "w") as f:
+            logger.debug("Created the buffer text file.")
             for tsurl in tslinks['videoUrls']:
                 i+=1
-                r = requests.head(yourl + tsurl)
+                r = requests.head(tsurl)
                 if r.status_code == 403:
-                    tsurl = yourl + tsurl[:-3] + "-muted.ts"
-                    print('\nfixed\n')
-                    print(tsurl)
+                    tsurl = tsurl[:-3] + "-muted.ts"
+                    logger.info("Found the muted version of this .ts file - " + tsurl + ".")
                     f.writelines(tsurl+'\n')
                 elif r.status_code == 200:
-                    tsurl = yourl + tsurl
-                    print('\nskipped\n')
-                    print(tsurl)
+                    logger.info("Found the unmuted version of this .ts file - " + tsurl + ".")
                     f.writelines(tsurl+'\n')
 
         a=9
 
-        lines = open("index-dvr.m3u8").read().splitlines()
-        with open("buffer.txt", "r") as f:
+        lines = open(orig_abs_file_path).read().splitlines()
+        with open(buf_abs_file_path, "r") as f:
             for line in f:
                 lines[a]=line.rstrip()
                 a+=2
-        open('index-dvr-muted.m3u8','w').write('\n'.join(lines))
+        open(mut_abs_file_path, "w").write('\n'.join(lines))
+        logger.info("Created the muted m3u8 file at \\" + mut_rel_path + ".")
+        os.remove(orig_abs_file_path)
+        logger.debug("Removed the original m3u8 file.")
+        os.remove(buf_abs_file_path)
+        logger.debug("Removed the buffer text file.")
 
 class vodthread(threading.Thread):
     def __init__(self, username, quality, gspread_client, gsheets_url, refreshtime):
