@@ -83,7 +83,7 @@ class ttvfunctions():
                     logger.debug("Got userid from username - "+info["data"][0]["id"])
                     return info["data"][0]["id"]
             else:
-                return "banned"
+                return None
         except requests.exceptions.RequestException as e:
             logger.debug("Error in get_id: " + str(e))
 
@@ -210,7 +210,6 @@ class vodthread(threading.Thread):
         self.subonly = subonly
         self.gsheets_url = gsheets_url
         self.old_status = 0
-        self.user_id = ttvfunctions().get_id(self.username, self.client_id)
         streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def run(self):
@@ -271,27 +270,32 @@ class vodthread(threading.Thread):
             logger.debug("Couldn't find a user_id.")
 
     def loopcheck(self):
-        logger.info("Checking " + str(self.username) + " (" + str(self.user_id) + ")" + " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
+        logger.info("Checking " + str(self.username) +  " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
         while True:
-            status = ttvfunctions().check_online(self.username, self.client_id)
-            if status == 2:
-                logger.error("Username not found. Invalid username or typo.")
+            self.user_id = ttvfunctions().get_id(self.username, self.client_id)
+            if self.user_id == None:
+                logger.error("No id found: check if streamer got banned.")
                 time.sleep(self.refresh)
-            elif status == 3:
-                logger.error("Unexpected error.")
-                time.sleep(self.refresh)
-            elif status == 1:
-                logger.debug(str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
-                time.sleep(self.refresh)
-            elif status == 0:
-                logger.debug(str(self.username)+" online. Fetching vods.")
-                
-                # start streamlink process
-                client.login()
-                self.vodchecker()
+            else:
+                status = ttvfunctions().check_online(self.username, self.client_id)
+                if status == 2:
+                    logger.error("Username not found. Invalid username or typo.")
+                    time.sleep(self.refresh)
+                elif status == 3:
+                    logger.error("Unexpected error.")
+                    time.sleep(self.refresh)
+                elif status == 1:
+                    logger.debug(str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
+                    time.sleep(self.refresh)
+                elif status == 0:
+                    logger.debug(str(self.username)+" online. Fetching vods.")
+                    
+                    # start streamlink process
+                    client.login()
+                    self.vodchecker()
 
-                #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
-                time.sleep(self.refresh)
+                    #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
+                    time.sleep(self.refresh)
 
 class launcher():
     def __init__(self, refreshtime):
