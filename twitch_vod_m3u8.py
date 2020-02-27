@@ -4,6 +4,8 @@
 
 import gspread
 import streamlink
+import sqlite3
+import pathlib
 from oauth2client.service_account import ServiceAccountCredentials
 import pytz
 import requests
@@ -17,10 +19,6 @@ import argparse
 import m3u8
 import re
 import logging
-
-scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
-creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
-client = gspread.authorize(creds)
 
 logger = logging.getLogger(__name__)
 logformat = logging.Formatter('[%(levelname)s][%(threadName)s][%(asctime)s] %(message)s')
@@ -104,6 +102,23 @@ class ttvfunctions():
 
         return status, info
 
+    def get_m3u8(self, info, count, quality, client_id):
+        secreturl = ttvfunctions().find_anipreview(info['data'][count]['id'], client_id)
+        if secreturl != "" or None:
+            if quality != "chunked":
+                fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/" + quality + "/index-dvr.m3u8"
+                if requests.head(fullurl).status_code == 403:
+                    fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
+            else:
+                fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
+            logger.debug("Found link "+ fullurl)
+            if info['data'][count]['type'] == 'archive':
+                values = [info['data'][count]['created_at'], info['data'][count]['title'], info['data'][count]['url'], fullurl, quality]
+                return fullurl, values
+            else:
+                return "notarchive", None
+        else:
+            return None, None
 class gensingle():
     def __init__(self, username):
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
@@ -196,7 +211,7 @@ class genmuted():
         open('index-dvr-muted.m3u8','w').write('\n'.join(lines))
 
 class vodthread(threading.Thread):
-    def __init__(self, username, quality, subonly, gsheets_url, refreshtime):
+    def __init__(self, local, username, quality, gsheets_url, refreshtime):
         threading.Thread.__init__(self)
         # global configuration
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
@@ -207,15 +222,15 @@ class vodthread(threading.Thread):
         # user configuration
         self.username = username
         self.quality = quality
-        self.subonly = subonly
-        self.gsheets_url = gsheets_url
+        self.local = local
+        if self.local == False:
+            self.gsheets_url = gsheets_url
         self.old_status = 0
-        streaml.set_plugin_option("twitch", "twitch_oauth_token", self.oauth_token)
 
     def run(self):
         self.loopcheck()
 
-    def vodchecker(self):
+    def vodcheckerSheets(self):
         if self.user_id != None:
             try:
                 sheet = client.open_by_url(self.gsheets_url).sheet1
@@ -225,39 +240,14 @@ class vodthread(threading.Thread):
                     if status == 0:
                         if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
                             for x in range(len(info['data'])-1, -1, -1):
-                                m3u8check = False
                                 time.sleep(1.5)
-                                if self.subonly == False:
-                                    try:
-                                        streams = streaml.streams(info['data'][x]['url'])
-                                        if self.quality not in streams:
-                                            self.quality = "best"
-                                        if sheet.findall(streams[self.quality].url) == []:
-                                            m3u8check = True
-                                        logger.debug("Found link "+ streams[self.quality].url)
-                                        if m3u8check and "muted" not in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                            values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'clean']
-                                            sheet.append_row(values)
-                                            logger.info("Added " + str(self.username) + "'s clean VOD "+ info['data'][x]['url'] + " to the list.")
-                                        if m3u8check and "muted" in streams[self.quality].url and info['data'][x]['type'] == 'archive':
-                                            values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], streams[self.quality].url, 'muted']
-                                            sheet.append_row(values)
-                                            logger.info("Added " + str(self.username) + "'s muted VOD "+ info['data'][x]['url'] + " to the list.")
-                                    except streamlink.exceptions.PluginError as e:
-                                        logger.error("Streamlink error: " + str(e))
+                                fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
+                                if fullurl != None and fullurl != "notarchive":
+                                    if sheet.findall(fullurl) == []:
+                                        sheet.append_row(values)
+                                        logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ info['data'][x]['url'] + " to the list.")
                                 else:
-                                    secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
-                                    if secreturl != "" or None:
-                                        fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
-                                        if sheet.findall(fullurl) == []:
-                                            m3u8check = True
-                                        logger.debug("Found link "+ fullurl)
-                                        if m3u8check and info['data'][x]['type'] == 'archive':
-                                            values = [info['data'][x]['created_at'], info['data'][x]['title'], info['data'][x]['url'], fullurl, 'subonly']
-                                            sheet.append_row(values)
-                                            logger.info("Added " + str(self.username) + "'s subonly VOD "+ info['data'][x]['url'] + " to the list.")
-                                    else:
-                                        logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
                         else:
                             logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
                     else:
@@ -268,6 +258,42 @@ class vodthread(threading.Thread):
                 logger.error("GSpread error: The service is currently unavailable. Code: " + str(e))
         else:
             logger.debug("Couldn't find a user_id.")
+
+    def vodcheckerLocal(self):
+        try:
+            if self.user_id != None:
+                path = pathlib.Path(self.username + "_vods.db")
+                if path.exists() != True:
+                    conn = sqlite3.connect(self.username + "_vods.db")
+                    cursor=conn.cursor()
+                    cursor.execute("""CREATE TABLE vods (timecode text, title text, twitchurl text, vodurl text, type text)""")
+                conn = sqlite3.connect(self.username + "_vods.db")
+                status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
+                cursor=conn.cursor()
+                if status == 0:
+                    if info != None and info['data'] != []:
+                        cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
+                        if cursor.fetchone() is None:
+                            for x in range(len(info['data'])-1, -1, -1):
+                                fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
+                                if fullurl != None and fullurl != "notarchive":
+                                    cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
+                                    if cursor.fetchone() is None:
+                                        cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                        logger.info("Added " + str(self.username) + "'s "+ self.quality +" VOD "+ info['data'][x]['url'] + " to the list.")
+                                else:
+                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+                                conn.commit()
+                        else:
+                            logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
+                    else:
+                        logger.debug("No VODs exist, checking again in " + str(self.refresh) + " seconds.")
+                else:
+                    logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
+            else:
+                logger.debug("Couldn't find a user_id.")
+        except TypeError as e:
+            logger.error("Caugth a TypeError in vodthread: " + str(e))
 
     def loopcheck(self):
         logger.info("Checking " + str(self.username) +  " every " + str(self.refresh) + " seconds. Get links with " + str(self.quality) + " quality.")
@@ -291,15 +317,19 @@ class vodthread(threading.Thread):
                     logger.debug(str(self.username)+" online. Fetching vods.")
                     
                     # start streamlink process
-                    client.login()
-                    self.vodchecker()
+                    if self.local == False:
+                        client.login()
+                        self.vodcheckerSheets()
+                    else:
+                        self.vodcheckerLocal()
 
                     #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
                     time.sleep(self.refresh)
 
 class launcher():
-    def __init__(self, refreshtime):
+    def __init__(self, refreshtime, local):
         self.refresh = refreshtime
+        self.local = local
         self.threads = []
 
     def run(self):
@@ -325,7 +355,10 @@ class launcher():
         logger.info("Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         i=1
         for stream in stream_list['list']:
-            thread = vodthread(stream['username'], stream['quality'], stream['subonly'], stream['gsheets'], self.refresh)
+            if self.local == False:
+                thread = vodthread(self.local, stream['username'], stream['quality'], stream['gsheets'], self.refresh)
+            else:
+                thread = vodthread(self.local, stream['username'], stream['quality'], None, self.refresh)
             thread.daemon = True
             thread.name =  str(i)+"-"+ stream['username'] + "-thread"
             self.threads.append(thread)
@@ -338,7 +371,10 @@ class launcher():
                 if t.is_alive() != True:
                     match = re.findall(r"^\d+", t.name)
                     n_in_list = int(match[0]) - 1
-                    thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['subonly'], stream_list['list'][n_in_list]['gsheets'], self.refresh)
+                    if self.local == False:
+                        thread = vodthread(self.local, stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['gsheets'], self.refresh)
+                    else:
+                        thread = vodthread(self.local, stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], None, self.refresh)
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
@@ -353,6 +389,7 @@ def main(argv):
     group.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
     group.add_argument("--makesheet", "-ms", nargs=2, metavar=('SHEET_NAME','SHARE_EMAIL'), help="Creates and shares a spreadsheet.", type=str)
     parser.add_argument("--verbose", "-v", help="Changes logging to verbose.", action="store_true")
+    parser.add_argument("--local", "-l", help="Instead of using Google Spreadsheets uses an SQLite db to save vod links.", action="store_true")
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(0)
@@ -379,9 +416,12 @@ def main(argv):
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
         logger.info("Launching crawl mode.")
-        global streaml
-        streaml = streamlink.Streamlink()
-        twitch_launcher = launcher(args.crawl)
+        if args.local == False:
+            global scope, creds, client
+            scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
+            creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
+            client = gspread.authorize(creds)
+        twitch_launcher = launcher(args.crawl, args.local)
         twitch_launcher.run()
     if args.single:
         if args.verbose:

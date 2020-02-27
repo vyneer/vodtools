@@ -3,19 +3,16 @@
 		{
 			"username" : "destiny",
 			"quality" : "720p",
-			"subonly" : false,
 			"gsheets" : "https://docs.google.com/spreadsheets/d/1wYuijV1_vLePTNLdDhzFHDHxe5dCdWBgsn-Gp1AdPKY"
 		},
 		{
 			"username" : "harkdan",
 			"quality" : "720p",
-			"subonly" : true,
 			"gsheets" : "https://docs.google.com/spreadsheets/d/1wXoEIwyil6L_m3-0cjYJLMRyt1hjYA5gqI8hsUnrNZY"
 		},
 		{
 			"username" : "iliedaboutcake",
 			"quality" : "720p",
-			"subonly" : false,
 			"gsheets" : "https://docs.google.com/spreadsheets/d/1yN82-yGt4MSDNjKMt7NwluHMh4X8NkuESHmxeM0Y03c"
 		}
 
