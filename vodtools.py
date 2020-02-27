@@ -13,7 +13,6 @@ import time
 import json
 import sys
 import datetime
-import client_twitch_oauth
 import threading
 import argparse
 import m3u8
@@ -64,7 +63,10 @@ class ttvfunctions():
             info = r.json()
             if info['animated_preview_url'] != [] or None:
                 result = re.findall(r"(?<=\/)[^\/]+(?=\/)", info['animated_preview_url'])
-                return result[1]
+                if result[1] != info['channel']['name']:
+                    return result[1]
+                else:
+                    return ""
             else:
                 return ""
         except requests.exceptions.RequestException as e:
@@ -122,8 +124,6 @@ class ttvfunctions():
 class gensingle():
     def __init__(self, username):
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
-        # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
-        self.oauth_token = client_twitch_oauth.token
         
         # user configuration
         self.username = username
@@ -136,26 +136,26 @@ class gensingle():
             if status == 0:
                 with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "wb") as memefile:
                     for x in range(len(info['data'])-1, -1, -1):
-                        secreturl = ttvfunctions().find_anipreview(info['data'][x]['id'], self.client_id)
-                        if secreturl != "" or None:
-                            fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/chunked/index-dvr.m3u8"
-                            logger.debug("Found link "+ fullurl)
-                            if info['data'][x]['type'] == 'archive':
-                                values = str(info['data'][x]['created_at'] + " - " + info['data'][x]['title'] + " - " + info['data'][x]['url'] + " - " + fullurl + "\n")
-                                memefile.write(values.encode('utf-8'))
-                                logger.info("Added " + str(self.username) + "'s VOD "+ info['data'][x]['url'] + " to the file.")
+                        fullurl, values = ttvfunctions().get_m3u8(info, x, "chunked", self.client_id)
+                        if fullurl != None and fullurl != "notarchive":
+                            values_str = str(values[0] + " - " + values[1] + " - " + values[2] + " - " + fullurl + "\n")
+                            memefile.write(values_str.encode('utf-8'))
+                            logger.info("Added " + str(self.username) + "'s chunked VOD "+ info['data'][x]['url'] + " to the text file.")
+                        elif fullurl == "notarchive":
+                            logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
                         else:
-                            logger.debug("No animated preview available at the moment for "+ str(self.username) + ".")
+                            logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + info['data'][x]['url'] + ".")
             else:
                  logger.error("HTTP error.")
                 
 class sheetmaker():
-    def __init__(self, makesheet):
+    def __init__(self, makesheet, gspread_client):
+        self.client = gspread_client
         self.sheetname=makesheet[0]+" m3u8 VOD links"
         self.shareemail=makesheet[1]
         
     def run(self):
-        kek = client.create(self.sheetname)
+        kek = self.client.create(self.sheetname)
         kek.share(self.shareemail, perm_type='user', role='writer')
         logger.info("Created the spreadsheet. Check your email for the URL.")
     
@@ -211,20 +211,17 @@ class genmuted():
         open('index-dvr-muted.m3u8','w').write('\n'.join(lines))
 
 class vodthread(threading.Thread):
-    def __init__(self, local, username, quality, gsheets_url, refreshtime):
+    def __init__(self, username, quality, gspread_client, gsheets_url, refreshtime):
         threading.Thread.__init__(self)
         # global configuration
         self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
-        # get oauth token value by typing `streamlink --twitch-oauth-authenticate` in terminal
-        self.oauth_token = client_twitch_oauth.token
         self.refresh = refreshtime
         
         # user configuration
         self.username = username
         self.quality = quality
-        self.local = local
-        if self.local == False:
-            self.gsheets_url = gsheets_url
+        self.gsheets_url = gsheets_url
+        self.client = gspread_client
         self.old_status = 0
 
     def run(self):
@@ -233,9 +230,9 @@ class vodthread(threading.Thread):
     def vodcheckerSheets(self):
         if self.user_id != None:
             try:
-                sheet = client.open_by_url(self.gsheets_url).sheet1
+                sheet = self.client.open_by_url(self.gsheets_url).sheet1
                 status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
-                client.login()
+                self.client.login()
                 try:
                     if status == 0:
                         if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
@@ -245,9 +242,11 @@ class vodthread(threading.Thread):
                                 if fullurl != None and fullurl != "notarchive":
                                     if sheet.findall(fullurl) == []:
                                         sheet.append_row(values)
-                                        logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ info['data'][x]['url'] + " to the list.")
+                                        logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ info['data'][x]['url'] + " to the spreadsheet.")
+                                elif fullurl == "notarchive":
+                                    logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
                                 else:
-                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + info['data'][x]['url'] + ". Retrying later.")
                         else:
                             logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
                     else:
@@ -280,9 +279,11 @@ class vodthread(threading.Thread):
                                     cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
                                     if cursor.fetchone() is None:
                                         cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
-                                        logger.info("Added " + str(self.username) + "'s "+ self.quality +" VOD "+ info['data'][x]['url'] + " to the list.")
+                                        logger.info("Added " + str(self.username) + "'s "+ self.quality +" VOD "+ info['data'][x]['url'] + " to the database.")
+                                elif fullurl == "notarchive":
+                                    logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
                                 else:
-                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + ". Retrying.")
+                                    logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + info['data'][x]['url'] + ". Retrying later.")
                                 conn.commit()
                         else:
                             logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
@@ -300,7 +301,7 @@ class vodthread(threading.Thread):
         while True:
             self.user_id = ttvfunctions().get_id(self.username, self.client_id)
             if self.user_id == None:
-                logger.error("No id found: check if streamer got banned.")
+                logger.error("No ID found: check if " + self.username + " got banned.")
                 time.sleep(self.refresh)
             else:
                 status = ttvfunctions().check_online(self.username, self.client_id)
@@ -314,11 +315,11 @@ class vodthread(threading.Thread):
                     logger.debug(str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
                     time.sleep(self.refresh)
                 elif status == 0:
-                    logger.debug(str(self.username)+" online. Fetching vods.")
+                    logger.debug(str(self.username)+" online. Fetching VODs.")
                     
                     # start streamlink process
-                    if self.local == False:
-                        client.login()
+                    if self.gsheets_url:
+                        self.client.login()
                         self.vodcheckerSheets()
                     else:
                         self.vodcheckerLocal()
@@ -327,9 +328,9 @@ class vodthread(threading.Thread):
                     time.sleep(self.refresh)
 
 class launcher():
-    def __init__(self, refreshtime, local):
+    def __init__(self, refreshtime):
+        self.scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
         self.refresh = refreshtime
-        self.local = local
         self.threads = []
 
     def run(self):
@@ -340,6 +341,17 @@ class launcher():
             logger.warning("System set check interval to 15 seconds.")
         with open("stream_list.json") as f:
             stream_list = json.load(f)
+        i=0
+        for stream in stream_list['list']:
+            if stream['gsheets'] != "":
+                i+=1
+        if i>0:
+            if pathlib.Path("client_secret.json").exists():
+                creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", self.scope)
+                client = gspread.authorize(creds)
+            else:
+                logger.error("No client_secret.json file in the directory.")
+                sys.exit(0)
         username_str = ""
         i=0
         for stream in stream_list['list']:
@@ -355,10 +367,10 @@ class launcher():
         logger.info("Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         i=1
         for stream in stream_list['list']:
-            if self.local == False:
-                thread = vodthread(self.local, stream['username'], stream['quality'], stream['gsheets'], self.refresh)
+            if stream['gsheets']:
+                thread = vodthread(stream['username'], stream['quality'], client, stream['gsheets'], self.refresh)
             else:
-                thread = vodthread(self.local, stream['username'], stream['quality'], None, self.refresh)
+                thread = vodthread(stream['username'], stream['quality'], None, None, self.refresh)
             thread.daemon = True
             thread.name =  str(i)+"-"+ stream['username'] + "-thread"
             self.threads.append(thread)
@@ -371,10 +383,10 @@ class launcher():
                 if t.is_alive() != True:
                     match = re.findall(r"^\d+", t.name)
                     n_in_list = int(match[0]) - 1
-                    if self.local == False:
-                        thread = vodthread(self.local, stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['gsheets'], self.refresh)
+                    if stream_list['list'][n_in_list]['gsheets']:
+                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], client, stream_list['list'][n_in_list]['gsheets'], self.refresh)
                     else:
-                        thread = vodthread(self.local, stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], None, self.refresh)
+                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], None, None, self.refresh)
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
@@ -389,8 +401,7 @@ def main(argv):
     group.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
     group.add_argument("--makesheet", "-ms", nargs=2, metavar=('SHEET_NAME','SHARE_EMAIL'), help="Creates and shares a spreadsheet.", type=str)
     parser.add_argument("--verbose", "-v", help="Changes logging to verbose.", action="store_true")
-    parser.add_argument("--local", "-l", help="Instead of using Google Spreadsheets uses an SQLite db to save vod links.", action="store_true")
-    if len(sys.argv)==1:
+    if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(0)
     args = parser.parse_args()
@@ -404,8 +415,15 @@ def main(argv):
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
         logger.info("Launching makesheet mode.")
-        twitch_launcher = sheetmaker(args.makesheet)
-        twitch_launcher.run()
+        scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
+        if pathlib.Path("client_secret.json").exists():
+            creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
+            client = gspread.authorize(creds)
+            twitch_launcher = sheetmaker(args.makesheet, client)
+            twitch_launcher.run()
+        else:
+            logger.error("No client_secret.json file in the directory.")
+            sys.exit(0)
     if args.crawl:
         if args.verbose:
             consoleHandler.setLevel(logging.DEBUG)
@@ -416,12 +434,7 @@ def main(argv):
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
         logger.info("Launching crawl mode.")
-        if args.local == False:
-            global scope, creds, client
-            scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
-            creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
-            client = gspread.authorize(creds)
-        twitch_launcher = launcher(args.crawl, args.local)
+        twitch_launcher = launcher(args.crawl)
         twitch_launcher.run()
     if args.single:
         if args.verbose:
