@@ -4,7 +4,6 @@
 
 import gspread
 import os
-import streamlink
 import sqlite3
 import pathlib
 from oauth2client.service_account import ServiceAccountCredentials
