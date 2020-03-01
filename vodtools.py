@@ -124,7 +124,7 @@ class ttvfunctions():
 
 class gensingle():
     def __init__(self, username):
-        self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
+        self.client_id = "kimne78kx3ncx6brgo4mv6wki5h1ko" # don't change this - twitch private client id
         
         # user configuration
         self.username = username
@@ -139,8 +139,8 @@ class gensingle():
                     for x in range(len(info['data'])-1, -1, -1):
                         fullurl, values = ttvfunctions().get_m3u8(info, x, "chunked", self.client_id)
                         if fullurl != None and fullurl != "notarchive":
-                            values_str = str(values[0] + " - " + values[1] + " - " + values[2] + " - " + fullurl + "\n")
-                            memefile.write(values_str.encode('utf-8'))
+                            values_str = u' - '.join((values[0], values[1], values[2], fullurl, "\n")).encode('utf-8')
+                            memefile.write(values_str)
                             logger.info("Added " + str(self.username) + "'s chunked VOD "+ info['data'][x]['url'] + " to the text file.")
                         elif fullurl == "notarchive":
                             logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
@@ -233,7 +233,7 @@ class vodthread(threading.Thread):
     def __init__(self, username, quality, gspread_client, gsheets_url, refreshtime):
         threading.Thread.__init__(self)
         # global configuration
-        self.client_id = "jzkbprff40iqj646a697cyrvl0zt2m6" # don't change this
+        self.client_id = "kimne78kx3ncx6brgo4mv6wki5h1ko" # don't change this - twitch private client id
         self.refresh = refreshtime
         
         # user configuration
