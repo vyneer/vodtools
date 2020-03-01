@@ -380,18 +380,25 @@ class launcher():
         for stream in stream_list['list']:
             i+=1
             if i==i_max:
-                username_str = username_str + stream['username']
+                if stream['gsheets']:
+                    username_str = username_str + stream['username'] + " (gs)"
+                else:
+                    username_str = username_str + stream['username'] + " (db)"
             else:
-                username_str = username_str + stream['username'] + ", "
+                if stream['gsheets']:
+                    username_str = username_str + stream['username'] + " (gs), "
+                else:
+                    username_str = username_str + stream['username'] + " (db), "
         logger.info("Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
         i=1
         for stream in stream_list['list']:
             if stream['gsheets']:
                 thread = vodthread(stream['username'], stream['quality'], client, stream['gsheets'], self.refresh)
+                thread.name =  str(i)+"-"+ stream['username'] + "-gs-thread"
             else:
                 thread = vodthread(stream['username'], stream['quality'], None, None, self.refresh)
+                thread.name =  str(i)+"-"+ stream['username'] + "-db-thread"
             thread.daemon = True
-            thread.name =  str(i)+"-"+ stream['username'] + "-thread"
             self.threads.append(thread)
             i+=1
             thread.start()
