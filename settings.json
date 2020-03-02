@@ -1,23 +1,29 @@
 {
+	"client_id":"kimne78kx3ncx6brgo4mv6wki5h1ko",
+	"oauth_token":"",
 	"list":[
 		{
 			"username" : "forsen",
 			"quality" : "chunked",
+			"refreshtime" : "",
 			"gsheets" : ""
 		},
 		{
 			"username" : "trainwreckstv",
 			"quality" : "chunked",
+			"refreshtime" : "",
 			"gsheets" : ""
 		},
 		{
 			"username" : "nymn",
 			"quality" : "chunked",
+			"refreshtime" : "",
 			"gsheets" : ""
 		},
 		{
-			"username" : "badbunny",
+			"username" : "iliedaboutcake",
 			"quality" : "chunked",
+			"refreshtime" : "",
 			"gsheets" : ""
 		}
 

@@ -31,16 +31,16 @@ consoleHandler.setFormatter(logformat)
 logger.addHandler(consoleHandler)
 
 class ttvfunctions():
-    def check_online(self, username, client_id):
+    def check_online(self, user_id, client_id, oauth_token):
         # 0: online, 
         # 1: offline, 
         # 2: not found, 
         # 3: error
-        url = 'https://api.twitch.tv/kraken/streams/' + username
+        url = 'https://api.twitch.tv/kraken/streams/' + user_id
         info = None
         status = 3
         try:
-            r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
+            r = requests.get(url, headers = {"Accept" : "application/vnd.twitchtv.v5+json", "Client-ID" : client_id, "Authorization" : "OAuth " + oauth_token}, timeout = 15)
             r.raise_for_status()
             info = r.json()
             if info['stream'] == None:
@@ -72,11 +72,11 @@ class ttvfunctions():
         except requests.exceptions.RequestException as e:
             logger.debug("Error in find_anipreview: " + str(e))
 
-    def get_id(self, username, client_id):
+    def get_id(self, username, client_id, oauth_token):
         url = 'https://api.twitch.tv/helix/users?login=' + username
         info = None
         try:
-            r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
+            r = requests.get(url, headers = {"Client-ID" : client_id, "Authorization" : "Bearer " + oauth_token}, timeout = 15)
             r.raise_for_status()
             info = r.json()
             if info['data'] != [] or None:
@@ -87,7 +87,7 @@ class ttvfunctions():
         except requests.exceptions.RequestException as e:
             logger.debug("Error in get_id: " + str(e))
 
-    def check_videos(self, user_id, client_id):
+    def check_videos(self, user_id, client_id, oauth_token):
         # 0: online, 
         # 1: offline, 
         # 2: not found, 
@@ -95,7 +95,7 @@ class ttvfunctions():
         url = 'https://api.twitch.tv/helix/videos?user_id=' + user_id + "&first=100"
         info = None
         try:
-            r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
+            r = requests.get(url, headers = {"Client-ID" : client_id, "Authorization" : "Bearer " + oauth_token}, timeout = 15)
             r.raise_for_status()
             info = r.json()
             status = 0
@@ -124,15 +124,18 @@ class ttvfunctions():
 
 class gensingle():
     def __init__(self, username):
-        self.client_id = "kimne78kx3ncx6brgo4mv6wki5h1ko" # don't change this - twitch private client id
+        with open("settings.json") as f:
+            stream_list = json.load(f)
+        self.client_id = stream_list['client_id']
+        self.oauth = stream_list['oauth_token']
         
         # user configuration
         self.username = username
         self.user_id = None
-        self.user_id = ttvfunctions().get_id(self.username, self.client_id)
+        self.user_id = ttvfunctions().get_id(self.username, self.client_id, self.oauth)
 
     def run(self):
-        status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
+        status, info = ttvfunctions().check_videos(self.user_id, self.client_id, self.oauth)
         if info != None and info['data'] != []:
             if status == 0:
                 with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "wb") as memefile:
@@ -230,10 +233,11 @@ class genmuted():
         logger.debug("Removed the buffer text file.")
 
 class vodthread(threading.Thread):
-    def __init__(self, username, quality, gspread_client, gsheets_url, refreshtime):
+    def __init__(self, username, quality, refreshtime, twitch_id, twitch_oauth, gspread_client, gsheets_url):
         threading.Thread.__init__(self)
         # global configuration
-        self.client_id = "kimne78kx3ncx6brgo4mv6wki5h1ko" # don't change this - twitch private client id
+        self.client_id = twitch_id
+        self.oauth = twitch_oauth
         self.refresh = refreshtime
         
         # user configuration
@@ -249,7 +253,7 @@ class vodthread(threading.Thread):
     def vodcheckerSheets(self):
         try:
             sheet = self.client.open_by_url(self.gsheets_url).sheet1
-            status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
+            status, info = ttvfunctions().check_videos(self.user_id, self.client_id, self.oauth)
             self.client.login()
             if status == 0:
                 if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
@@ -288,7 +292,7 @@ class vodthread(threading.Thread):
             if cursor.fetchone()[0] == 0:
                 sql_cmd = '''CREATE TABLE {} (timecode text, title text, twitchurl text, vodurl text, type text)'''.format(self.username)
                 cursor.execute(sql_cmd)
-            status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
+            status, info = ttvfunctions().check_videos(self.user_id, self.client_id, self.oauth)
             if status == 0:
                 if info != None and info['data'] != []:
                     sql_cmd = '''SELECT * FROM {} WHERE twitchurl=?'''.format(self.username)
@@ -324,7 +328,7 @@ class vodthread(threading.Thread):
         else:
             logger.info("Checking " + str(self.username) +  " every " + str(self.refresh) + " seconds. Adding links with " + str(self.quality) + " quality to the local SQLite database.")
         while True:
-            self.user_id = ttvfunctions().get_id(self.username, self.client_id)
+            self.user_id = ttvfunctions().get_id(self.username, self.client_id, self.oauth)
             if self.user_id == None:
                 if banned_bool == False:
                     logger.error("No ID found: check if " + self.username + " got banned.")
@@ -332,7 +336,7 @@ class vodthread(threading.Thread):
                 time.sleep(self.refresh)
             else:
                 banned_bool = False
-                status = ttvfunctions().check_online(self.username, self.client_id)
+                status = ttvfunctions().check_online(self.user_id, self.client_id, self.oauth)
                 if status == 2:
                     logger.error("Username not found. Invalid username or typo.")
                     time.sleep(self.refresh)
@@ -356,18 +360,12 @@ class vodthread(threading.Thread):
                     time.sleep(self.refresh)
 
 class launcher():
-    def __init__(self, refreshtime):
+    def __init__(self):
         self.scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
-        self.refresh = refreshtime
         self.threads = []
 
     def run(self):
-        # make sure the interval to check user availability is not less than 15 seconds
-        if(self.refresh < 15):
-            logger.warning("Check interval should not be lower than 15 seconds.")
-            self.refresh = 15
-            logger.warning("System set check interval to 15 seconds.")
-        with open("stream_list.json") as f:
+        with open("settings.json") as f:
             stream_list = json.load(f)
         i=0
         for stream in stream_list['list']:
@@ -387,25 +385,36 @@ class launcher():
         i_max = i
         i=0
         for stream in stream_list['list']:
+            if not stream['refreshtime']:
+                refreshtime = 60
+            else:
+                refreshtime = stream['refreshtime']
             i+=1
             if i==i_max:
                 if stream['gsheets']:
-                    username_str = username_str + stream['username'] + " (gs)"
+                    username_str = username_str + stream['username'] + " (gs) " + "(" + str(refreshtime) + "s)"
                 else:
-                    username_str = username_str + stream['username'] + " (db)"
+                    username_str = username_str + stream['username'] + " (db) " + "(" + str(refreshtime) + "s)"
             else:
                 if stream['gsheets']:
-                    username_str = username_str + stream['username'] + " (gs), "
+                    username_str = username_str + stream['username'] + " (gs) " + "(" + str(refreshtime) + "s), "
                 else:
-                    username_str = username_str + stream['username'] + " (db), "
-        logger.info("Checking " + str(username_str) + " every " + str(self.refresh) + " seconds.")
+                    username_str = username_str + stream['username'] + " (db) " + "(" + str(refreshtime) + "s), "
+        logger.info("Getting m3u8 links for: " + str(username_str))
         i=1
         for stream in stream_list['list']:
+            if not stream['refreshtime']:
+                refreshtime = 60
+            else:
+                refreshtime = stream['refreshtime']
+            if int(refreshtime) < 15:
+                logger.error("Refresh time < 15 not allowed.")
+                sys.exit(0)
             if stream['gsheets']:
-                thread = vodthread(stream['username'], stream['quality'], client, stream['gsheets'], self.refresh)
+                thread = vodthread(stream['username'], stream['quality'], int(refreshtime), stream_list['client_id'], stream_list['oauth_token'], client, stream['gsheets'])                    
                 thread.name =  str(i)+"-"+ stream['username'] + "-gs-thread"
             else:
-                thread = vodthread(stream['username'], stream['quality'], None, None, self.refresh)
+                thread = vodthread(stream['username'], stream['quality'], int(refreshtime), stream_list['client_id'], stream_list['oauth_token'], None, None)              
                 thread.name =  str(i)+"-"+ stream['username'] + "-db-thread"
             thread.daemon = True
             self.threads.append(thread)
@@ -419,9 +428,9 @@ class launcher():
                     match = re.findall(r"^\d+", t.name)
                     n_in_list = int(match[0]) - 1
                     if stream_list['list'][n_in_list]['gsheets']:
-                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], client, stream_list['list'][n_in_list]['gsheets'], self.refresh)
+                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], stream_list['list'][n_in_list]['client_id'], stream_list['list'][n_in_list]['oauth_token'], client, stream_list['list'][n_in_list]['gsheets'])
                     else:
-                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], None, None, self.refresh)
+                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], stream_list['list'][n_in_list]['client_id'], stream_list['list'][n_in_list]['oauth_token'], None, None)
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
@@ -432,7 +441,7 @@ def main(argv):
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
-    group.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet. Default refresh time is 60 seconds.", nargs='?',type=int, const=60)
+    group.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet.", action="store_true")
     group.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
     group.add_argument("--makesheet", "-ms", nargs=2, metavar=('SHEET_NAME','SHARE_EMAIL'), help="Creates and shares a spreadsheet.", type=str)
     parser.add_argument("--verbose", "-v", help="Changes logging to verbose.", action="store_true")
@@ -469,7 +478,7 @@ def main(argv):
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
         logger.info("Launching crawl mode.")
-        twitch_launcher = launcher(args.crawl)
+        twitch_launcher = launcher()
         twitch_launcher.run()
     if args.single:
         if args.verbose:
