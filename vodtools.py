@@ -275,24 +275,33 @@ class vodthread(threading.Thread):
 
     def vodcheckerLocal(self):
         try:
-            path = pathlib.Path(self.username + "_vods.db")
+            path = pathlib.Path("voddb.db")
             if path.exists() != True:
-                conn = sqlite3.connect(self.username + "_vods.db")
+                conn = sqlite3.connect("voddb.db")
                 cursor=conn.cursor()
-                cursor.execute("""CREATE TABLE vods (timecode text, title text, twitchurl text, vodurl text, type text)""")
-            conn = sqlite3.connect(self.username + "_vods.db")
-            status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
+                sql_cmd = '''CREATE TABLE {} (timecode text, title text, twitchurl text, vodurl text, type text)'''.format(self.username)
+                cursor.execute(sql_cmd)
+            conn = sqlite3.connect("voddb.db")
             cursor=conn.cursor()
+            sql_cmd = ''' SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{}' '''.format(self.username)
+            cursor.execute(sql_cmd)
+            if cursor.fetchone()[0] == 0:
+                sql_cmd = '''CREATE TABLE {} (timecode text, title text, twitchurl text, vodurl text, type text)'''.format(self.username)
+                cursor.execute(sql_cmd)
+            status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
             if status == 0:
                 if info != None and info['data'] != []:
-                    cursor.execute('SELECT * FROM vods WHERE twitchurl=?', (info['data'][0]['url'],))
+                    sql_cmd = '''SELECT * FROM {} WHERE twitchurl=?'''.format(self.username)
+                    cursor.execute(sql_cmd, (info['data'][0]['url'],))
                     if cursor.fetchone() is None:
                         for x in range(len(info['data'])-1, -1, -1):
                             fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
                             if fullurl != None and fullurl != "notarchive":
-                                cursor.execute('SELECT * FROM vods WHERE vodurl=?', (fullurl,))
+                                sql_cmd = '''SELECT * FROM {} WHERE vodurl=?'''.format(self.username)
+                                cursor.execute(sql_cmd, (fullurl,))
                                 if cursor.fetchone() is None:
-                                    cursor.execute("INSERT INTO vods VALUES (?,?,?,?,?)", values)
+                                    sql_cmd = '''INSERT INTO {} VALUES (?,?,?,?,?)'''.format(self.username)
+                                    cursor.execute(sql_cmd, (values))
                                     logger.info("Added " + str(self.username) + "'s "+ self.quality +" VOD "+ info['data'][x]['url'] + " to the database.")
                             elif fullurl == "notarchive":
                                 logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
