@@ -71,6 +71,7 @@ class ttvfunctions():
         info = None
         status = 3
         try:
+            time.sleep(0.01)
             r = requests.get(url, headers = {"Accept" : "application/vnd.twitchtv.v5+json", "Client-ID" : client_id, "Authorization" : "OAuth " + oauth_token}, timeout = 15)
             r.raise_for_status()
             info = r.json()
@@ -89,6 +90,7 @@ class ttvfunctions():
         url = 'https://api.twitch.tv/kraken/videos/' + vod_id
         info = None
         try:
+            time.sleep(0.01)
             r = requests.get(url, headers = {"Client-ID" : client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
@@ -107,6 +109,7 @@ class ttvfunctions():
         url = 'https://api.twitch.tv/helix/users?login=' + username
         info = None
         try:
+            time.sleep(0.01)
             r = requests.get(url, headers = {"Client-ID" : client_id, "Authorization" : "Bearer " + oauth_token}, timeout = 15)
             r.raise_for_status()
             info = r.json()
@@ -126,6 +129,7 @@ class ttvfunctions():
         url = 'https://api.twitch.tv/helix/videos?user_id=' + user_id + "&first=100"
         info = None
         try:
+            time.sleep(0.01)
             r = requests.get(url, headers = {"Client-ID" : client_id, "Authorization" : "Bearer " + oauth_token}, timeout = 15)
             r.raise_for_status()
             info = r.json()
