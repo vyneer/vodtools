@@ -463,9 +463,9 @@ class launcher():
                     match = re.findall(r"^\d+", t.name)
                     n_in_list = int(match[0]) - 1
                     if stream_list['list'][n_in_list]['gsheets']:
-                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], stream_list['list'][n_in_list]['client_id'], stream_list['list'][n_in_list]['oauth_token'], client, stream_list['list'][n_in_list]['gsheets'])
+                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], stream_list['client_id'], stream_list['oauth_token'], client, stream_list['list'][n_in_list]['gsheets'])
                     else:
-                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], stream_list['list'][n_in_list]['client_id'], stream_list['list'][n_in_list]['oauth_token'], None, None)
+                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], stream_list['client_id'], stream_list['oauth_token'], None, None)
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
