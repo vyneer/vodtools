@@ -39,7 +39,7 @@ Continuosly fetches links to .m3u8 files and pastes them into either a local SQL
 Setup the list of channels in settings.json. Username and quality are required parameters, refreshtime is optional (default is 60 sec.).
 Paste the Google Spreadsheet URL into the gsheets parameter to paste the data into, well, a Google Spreadsheet.
 
-### -s <username>, --single <username>
+### -s <user_name>, --single <user_name>
 
 ```python3 vodtools.py -s destiny```
 
