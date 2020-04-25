@@ -67,15 +67,15 @@ class ttvfunctions():
         # 1: offline, 
         # 2: not found, 
         # 3: error
-        url = 'https://api.twitch.tv/kraken/streams/' + user_id
+        url = 'https://api.twitch.tv/helix/streams?user_id=' + user_id
         info = None
         status = 3
         try:
             time.sleep(0.01)
-            r = requests.get(url, headers = {"Accept" : "application/vnd.twitchtv.v5+json", "Client-ID" : client_id, "Authorization" : "OAuth " + oauth_token}, timeout = 15)
+            r = requests.get(url, headers = {"Client-ID" : client_id, "Authorization" : "Bearer " + oauth_token}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            if info['stream'] == None:
+            if info['data'] == None:
                 status = 1
             else:
                 status = 0
