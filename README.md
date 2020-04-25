@@ -1,6 +1,11 @@
 # vodtools
 twitch vod tool suite written in python
 
+## Why?
+
+1. It's a fun project!
+2. I like archiving things.
+3. While big streamers usually have people that download/link deleted vods manually, smaller streamers don't, so I wanted to automate the process.
 
 ## How to install
 
@@ -43,7 +48,7 @@ Paste the Google Spreadsheet URL into the gsheets parameter to paste the data in
 
 ```python3 vodtools.py -s destiny```
 
-Fetches vods once for a specific streamer and pastes them into a .txt file.
+Fetches all vods once for a specific streamer and pastes them into a .txt file.
 
 ### -gm <m3u8_url>, --genmuted <m3u8_url>
 
