@@ -120,7 +120,7 @@ class ttvfunctions():
             r = requests.post(url, json = {"query" : query}, headers = {"Client-ID" : twitch_client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            if info['data']['video'] != [] or None or "null":
+            if info['data']['video'] != None:
                 result = re.findall(r"(?<=\/)[^\/]+(?=\/)", info['data']['video']['animatedPreviewURL'])
                 return result[1]
             else:
@@ -336,7 +336,7 @@ class vodthread(threading.Thread):
             status, info = ttvfunctions().check_videos(self.user_id)
             self.client.login()
             if status == 0:
-                if info != None and info['data']['user'] != "null" or [] and sheet.findall("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['id']) == [] or None:
+                if info != None and info['data']['user'] != None and sheet.findall("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['id']) == [] or None:
                     for x in range(len(info['data']['user']['videos']['edges'])-1, -1, -1):
                         time.sleep(1.5)
                         fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality)
