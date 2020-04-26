@@ -337,7 +337,7 @@ class vodthread(threading.Thread):
             self.client.login()
             if status == 0:
                 if info != None and info['data']['user'] != "null" or [] and sheet.findall("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['id']) == [] or None:
-                    for x in range(len(info['data'])-1, -1, -1):
+                    for x in range(len(info['data']['user']['videos']['edges'])-1, -1, -1):
                         time.sleep(1.5)
                         fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality)
                         if fullurl != None and fullurl != "notarchive":
