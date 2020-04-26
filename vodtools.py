@@ -94,7 +94,7 @@ class ttvfunctions():
             r = requests.post(url, json = {"query" : query}, headers = {"Client-ID" : twitch_client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            if info['data']['user']['stream'] == "null" or None:
+            if info['data']['user']['stream'] == None:
                 status = 1
             else:
                 status = 0
@@ -143,7 +143,7 @@ class ttvfunctions():
             r = requests.post(url, json = {"query" : query}, headers = {"Client-ID" : twitch_client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            if info['data']['user']['id'] != [] or None:
+            if info['data']['user'] != None:
                     logger.debug("Got userid from username - "+info['data']['user']['id'])
                     return info['data']['user']['id']
             else:
@@ -336,18 +336,18 @@ class vodthread(threading.Thread):
             status, info = ttvfunctions().check_videos(self.user_id)
             self.client.login()
             if status == 0:
-                if info != None and info['data']['user'] != "null" or [] and sheet.findall("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['url']) == [] or None:
+                if info != None and info['data']['user'] != "null" or [] and sheet.findall("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['id']) == [] or None:
                     for x in range(len(info['data'])-1, -1, -1):
                         time.sleep(1.5)
                         fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality)
                         if fullurl != None and fullurl != "notarchive":
                             if sheet.findall(fullurl) == []:
                                 sheet.append_row(values)
-                                logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['url'] + " to the spreadsheet.")
+                                logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + " to the spreadsheet.")
                         elif fullurl == "notarchive":
-                            logger.debug("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['url'] + " - VOD's type differs from 'archive'.")
+                            logger.debug("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + " - VOD's type differs from 'archive'.")
                         else:
-                            logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['url'] + ". Retrying later.")
+                            logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + ". Retrying later.")
                 else:
                     logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
             else:
@@ -386,11 +386,11 @@ class vodthread(threading.Thread):
                                 if cursor.fetchone() is None:
                                     sql_cmd = '''INSERT INTO {} VALUES (?,?,?,?,?)'''.format(self.username)
                                     cursor.execute(sql_cmd, (values))
-                                    logger.info("Added " + str(self.username) + "'s "+ self.quality +" VOD "+ "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['url'] + " to the database.")
+                                    logger.info("Added " + str(self.username) + "'s "+ self.quality +" VOD "+ "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + " to the database.")
                             elif fullurl == "notarchive":
-                                logger.debug("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['url'] + " - VOD's type differs from 'archive'.")
+                                logger.debug("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + " - VOD's type differs from 'archive'.")
                             else:
-                                logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['url'] + ". Retrying later.")
+                                logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + ". Retrying later.")
                             conn.commit()
                     else:
                         logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
