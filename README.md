@@ -65,5 +65,12 @@ Creates a Google Spreadsheet and sends an invite to the email you specified.
 
 ### -v, --verbose
 
+```
+python3 vodtools.py -vc
+python3 vodtools.py -vs destiny
+python3 vodtools.py -vgm http://thedankestmeme.com/foobar.m3u8
+python3 vodtools.py -vms xqc foo@bar.gg
+```
+
 Self-explainatory.
 
