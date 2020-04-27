@@ -374,7 +374,7 @@ class vodthread(threading.Thread):
                 cursor.execute(sql_cmd)
             status, info = ttvfunctions().check_videos(self.user_id)
             if status == 0:
-                if info != None and info['data']['user'] != "null" or []:
+                if info != None and info['data']['user'] != None:
                     sql_cmd = '''SELECT * FROM {} WHERE twitchurl=?'''.format(self.username)
                     cursor.execute(sql_cmd, ("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['id'],))
                     if cursor.fetchone() is None:
@@ -399,7 +399,7 @@ class vodthread(threading.Thread):
             else:
                 logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
         except TypeError as e:
-            logger.error("Caugth a TypeError in vodthread: " + str(e))
+            logger.error("Caught a TypeError in vodthread: " + str(e))
 
     def loopcheck(self):
         banned_bool = False
