@@ -94,10 +94,13 @@ class ttvfunctions():
             r = requests.post(url, json = {"query" : query}, headers = {"Client-ID" : twitch_client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            if info['data']['user']['stream'] == None:
-                status = 1
+            if 'errors' in info:
+                status = 3
             else:
-                status = 0
+                if info['data']['user']['stream'] == None:
+                    status = 1
+                else:
+                    status = 0
         except requests.exceptions.RequestException as e:
             if e.response:
                 if e.response.reason == 'Not Found' or e.response.reason == 'Unprocessable Entity':
@@ -143,13 +146,18 @@ class ttvfunctions():
             r = requests.post(url, json = {"query" : query}, headers = {"Client-ID" : twitch_client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            if info['data']['user'] != None:
+            if 'errors' in info:
+                logger.error("Returned None in get_id: " + str(info))
+                return None
+            else:
+                if info['data']['user'] != []:
                     logger.debug("Got userid from username - "+info['data']['user']['id'])
                     return info['data']['user']['id']
-            else:
-                return None
+                else:
+                    logger.error("Returned None in get_id: " + str(info))
+                    return None
         except requests.exceptions.RequestException as e:
-            logger.debug("Error in get_id: " + str(e))
+            logger.error("Error in get_id: " + str(e))
 
     def check_videos(self, user_id):
         # 0: online, 
@@ -185,8 +193,13 @@ class ttvfunctions():
             r = requests.post(url, json = {"query" : query}, headers = {"Client-ID" : twitch_client_id}, timeout = 15)
             r.raise_for_status()
             info = r.json()
-            status = 0
-        except requests.exceptions.RequestException:
+            if 'errors' in info:
+                logger.error("Returned 1 in check_videos: " + str(info))
+                status = 1
+            else:
+                status = 0
+        except requests.exceptions.RequestException as e:
+            logger.error("Returned 1 in check_status: " + str(e))
             status = 1
 
         return status, info
@@ -218,7 +231,7 @@ class gensingle():
 
     def run(self):
         status, info = ttvfunctions().check_videos(self.user_id)
-        if info != None and info['data']['user'] != "null" or []:
+        if info != None and info['data']['user']['videos']['edges'] != []:
             if status == 0:
                 with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "wb") as memefile:
                     for x in range(len(info['data']['user']['videos']['edges'])-1, -1, -1):
@@ -333,25 +346,32 @@ class vodthread(threading.Thread):
     def vodcheckerSheets(self):
         try:
             sheet = self.client.open_by_url(self.gsheets_url).sheet1
+            url_col = sheet.col_values(3)
+            m3u8_col = sheet.col_values(4)
             status, info = ttvfunctions().check_videos(self.user_id)
             self.client.login()
             if status == 0:
-                if info != None and info['data']['user'] != None and sheet.findall("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['id']) == [] or None:
-                    for x in range(len(info['data']['user']['videos']['edges'])-1, -1, -1):
-                        time.sleep(1.5)
+                if info != None and info['data']['user']['videos']['edges'] != [] and str("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['id']) not in url_col:
+                    buffer_url = []
+                    buffer_val = []
+                    for x in range(0, len(info['data']['user']['videos']['edges']), 1):
                         fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality)
-                        if fullurl != None and fullurl != "notarchive":
-                            if sheet.findall(fullurl) == []:
-                                sheet.append_row(values)
-                                logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + " to the spreadsheet.")
-                        elif fullurl == "notarchive":
+                        buffer_url.append(fullurl)
+                        buffer_val.append(values)
+                    for x in range(len(buffer_val)-1, -1, -1):
+                        time.sleep(1.5)
+                        if buffer_url[x] != None and buffer_url[x] != "notarchive":
+                            if buffer_url[x] not in m3u8_col:
+                                sheet.append_row(buffer_val[x])
+                                logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ buffer_val[x][2] + " to the spreadsheet.")
+                        elif buffer_url[x] == "notarchive":
                             logger.debug("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + " - VOD's type differs from 'archive'.")
                         else:
                             logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + "https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][x]['node']['id'] + ". Retrying later.")
                 else:
                     logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
             else:
-                logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
+                logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds. Status: " + str(status))
         except gspread.exceptions.APIError as e:
             logger.error("GSpread error: APIError. Code: " + str(e))
         except gspread.exceptions.GSpreadException as e:
@@ -374,7 +394,7 @@ class vodthread(threading.Thread):
                 cursor.execute(sql_cmd)
             status, info = ttvfunctions().check_videos(self.user_id)
             if status == 0:
-                if info != None and info['data']['user'] != None:
+                if info != None and info['data']['user']['videos']['edges'] != []:
                     sql_cmd = '''SELECT * FROM {} WHERE twitchurl=?'''.format(self.username)
                     cursor.execute(sql_cmd, ("https://www.twitch.tv/videos/" + info['data']['user']['videos']['edges'][0]['node']['id'],))
                     if cursor.fetchone() is None:
@@ -413,19 +433,19 @@ class vodthread(threading.Thread):
                 if banned_bool == False:
                     logger.error("No ID found: check if " + self.username + " got banned.")
                 banned_bool = True
-                time.sleep(self.refresh)
+                time.sleep(int(self.refresh))
             else:
                 banned_bool = False
                 status = ttvfunctions().check_online(self.user_id)
                 if status == 2:
                     logger.error("Username not found. Invalid username or typo.")
-                    time.sleep(self.refresh)
+                    time.sleep(int(self.refresh))
                 elif status == 3:
                     logger.error("Unexpected error.")
-                    time.sleep(self.refresh)
+                    time.sleep(int(self.refresh))
                 elif status == 1:
                     logger.debug(str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
-                    time.sleep(self.refresh)
+                    time.sleep(int(self.refresh))
                 elif status == 0:
                     logger.debug(str(self.username)+" online. Fetching VODs.")
                     
@@ -437,7 +457,7 @@ class vodthread(threading.Thread):
                         self.vodcheckerLocal()
 
                     #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
-                    time.sleep(self.refresh)
+                    time.sleep(int(self.refresh))
 
 class launcher():
     def __init__(self):
@@ -507,10 +527,14 @@ class launcher():
                 if t.is_alive() != True:
                     match = re.findall(r"^\d+", t.name)
                     n_in_list = int(match[0]) - 1
-                    if stream_list['list'][n_in_list]['gsheets']:
-                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], client, stream_list['list'][n_in_list]['gsheets'])
+                    if not stream_list['list'][n_in_list]['refreshtime']:
+                        refreshtime = 60
                     else:
-                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], None, None)
+                        refreshtime = stream_list['list'][n_in_list]['refreshtime']
+                    if stream_list['list'][n_in_list]['gsheets']:
+                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], int(refreshtime), client, stream_list['list'][n_in_list]['gsheets'])
+                    else:
+                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], int(refreshtime), None, None)
                     thread.daemon = True
                     thread.name = t.name
                     self.threads.append(thread)
