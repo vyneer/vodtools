@@ -335,25 +335,32 @@ class vodthread(threading.Thread):
     def vodcheckerSheets(self):
         try:
             sheet = self.client.open_by_url(self.gsheets_url).sheet1
+            url_col = sheet.col_values(3)
+            m3u8_col = sheet.col_values(4)
             status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
             self.client.login()
             if status == 0:
-                if info != None and info['data'] != [] and sheet.findall(info['data'][0]['url']) == [] or None:
-                    for x in range(len(info['data'])-1, -1, -1):
-                        time.sleep(1.5)
+                if info != None and info['data'] != [] and str(info['data'][0]['url']) not in url_col:
+                    buffer_url = []
+                    buffer_val = []
+                    for x in range(0, len(info['data']), 1):
                         fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
-                        if fullurl != None and fullurl != "notarchive":
-                            if sheet.findall(fullurl) == []:
-                                sheet.append_row(values)
-                                logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ info['data'][x]['url'] + " to the spreadsheet.")
-                        elif fullurl == "notarchive":
+                        buffer_url.append(fullurl)
+                        buffer_val.append(values)
+                    for x in range(len(buffer_val)-1, -1, -1):
+                        time.sleep(1.5)
+                        if buffer_url[x] != None and buffer_url[x] != "notarchive":
+                            if buffer_url[x] not in m3u8_col:
+                                sheet.append_row(buffer_val[x])
+                                logger.info("Added " + str(self.username) + "'s "+ self.quality + " VOD "+ buffer_val[x][2] + " to the spreadsheet.")
+                        elif buffer_url[x] == "notarchive":
                             logger.debug(info['data'][x]['url'] + " - VOD's type differs from 'archive'.")
                         else:
                             logger.debug("No animated preview available at the moment for "+ str(self.username) + "'s VOD - " + info['data'][x]['url'] + ". Retrying later.")
                 else:
                     logger.debug("No new VODs, checking again in " + str(self.refresh) + " seconds.")
             else:
-                logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
+                logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds. Status: " + str(status))
         except gspread.exceptions.APIError as e:
             logger.error("GSpread error: APIError. Code: " + str(e))
         except gspread.exceptions.GSpreadException as e:

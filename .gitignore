@@ -132,6 +132,7 @@ dmypy.json
 
 client_secret.json
 settings.json
+twitch_oauth.json
 client_twitch_oauth.py
 *.code-workspace
 meme.py
