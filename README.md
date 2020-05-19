@@ -57,6 +57,12 @@ Fetches all vods once for a specific streamer and pastes them into a .txt file.
 Downloads the .m3u8 file and replaces (dead) links to unmuted fragments with (alive) links to muted fragments. 
 Useful in case of a muted deleted VOD. Also, it takes awhile to go through the file.
 
+### -ch <vod_url>, --chat <vod_url>
+
+```python3 vodtools.py -ch https://www.twitch.tv/videos/624096739```
+
+Downloads the chat from a VOD into a textfile. 
+
 ### -ms <sheet_name> <share_email>, --makesheet <sheet_name> <share_email>
 
 ```python3 vodtools.py -ms xqc foo@bar.gg```

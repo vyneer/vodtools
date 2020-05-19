@@ -107,6 +107,79 @@ class ttvfunctions():
             return __, oauth_token
 
 
+    def get_chat(self, vod_id, cursor):
+        # 0: online, 
+        # 1: offline
+        url = 'https://gql.twitch.tv/gql'
+        info = None
+        if cursor == "":
+            query = '''
+                query {
+                    video(id: "%s") {
+                        id
+                        title
+                        createdAt
+                        comments(after: "") {
+                            edges {
+                                cursor
+                                node {
+                                    createdAt
+                                    commenter {
+                                        displayName
+                                    }
+                                    message {
+                                        fragments {
+                                            text
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ''' % vod_id
+        else:
+            query = '''
+                query {
+                    video(id: "%s") {
+                        id
+                        title
+                        createdAt
+                        comments(after: "%s") {
+                            edges {
+                                cursor
+                                node {
+                                    createdAt
+                                    commenter {
+                                        displayName
+                                    }
+                                    message {
+                                        fragments {
+                                            text
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ''' % (vod_id, cursor)
+        try:
+            time.sleep(0.01)
+            r = requests.post(url, json = {"query" : query}, headers = {"Client-ID" : "kimne78kx3ncx6brgo4mv6wki5h1ko"}, timeout = 15)
+            r.raise_for_status()
+            info = r.json()
+            if 'errors' in info:
+                logger.error("Returned 1 in get_chat: " + str(info))
+                status = 1
+            else:
+                status = 0
+        except requests.exceptions.RequestException as e:
+            logger.error("Returned 1 in get_chat: " + str(e))
+            status = 1
+
+        return status, info
+
     def check_online(self, user_id, client_id):
         __, oauth_token = self.validate_token()
         if __ == 0 and oauth_token == 0:
@@ -317,6 +390,63 @@ class genmuted():
         logger.debug("Removed the original m3u8 file.")
         os.remove(buf_abs_file_path)
         logger.debug("Removed the buffer text file.")
+
+class downchat():
+    def __init__(self, url):      
+        # user configuration
+        self.vodurl = url
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    def run(self):
+        rel_path = "chatlogs"
+        abs_file_path = os.path.join(self.script_dir, rel_path)
+
+        if os.path.exists(abs_file_path) == False:
+            os.mkdir(abs_file_path)
+
+        vod_id = re.findall(r'(?=[0-9])[^\/]+', self.vodurl)[0]
+        cursor = ""
+        logger.info("Getting chat from VOD number - " + vod_id + ".")
+        status, info = ttvfunctions().get_chat(vod_id, cursor)
+        txt_rel_path = "chatlogs\\" + vod_id + "_chat.txt"
+        txt_abs_file_path = os.path.join(self.script_dir, txt_rel_path)
+        if info != None and info['data']['video'] != [] and info['data']['video'] != None and info['data']['video']['comments']['edges'] != [] and info['data']['video']['comments']['edges'] != None:
+            if status == 0:
+                with open(txt_abs_file_path, "w", encoding='utf-8') as memefile:
+                    cursor = info['data']['video']['comments']['edges'][0]['cursor']
+                    logger.debug("Got cursor - " + cursor + ".")
+                    for x in range(len(info['data']['video']['comments']['edges'])):
+                        message = ""
+                        for y in range(len(info['data']['video']['comments']['edges'][x]['node']['message']['fragments'])):
+                            message += info['data']['video']['comments']['edges'][x]['node']['message']['fragments'][y]['text']
+                        if info['data']['video']['comments']['edges'][x]['node']['commenter'] == None:
+                            username = "DELETED_USER"
+                        else:
+                            username = info['data']['video']['comments']['edges'][x]['node']['commenter']['displayName']
+                        string = u"[{}] {}: {} \n".format(info['data']['video']['comments']['edges'][x]['node']['createdAt'], username, message)
+                        memefile.write(string)
+            else:
+                logger.error("HTTP error.")
+        while cursor != "": 
+            status, info = ttvfunctions().get_chat(vod_id, cursor)
+            if info != None and info['data']['video'] != [] and info['data']['video'] != None and info['data']['video']['comments']['edges'] != [] and info['data']['video']['comments']['edges'] != None:
+                if status == 0:
+                    with open(txt_abs_file_path, "a", encoding='utf-8') as memefile:
+                        cursor = info['data']['video']['comments']['edges'][0]['cursor']
+                        logger.debug("Got cursor - " + cursor + ".")
+                        for x in range(len(info['data']['video']['comments']['edges'])):
+                            message = ""
+                            for y in range(len(info['data']['video']['comments']['edges'][x]['node']['message']['fragments'])):
+                                message += info['data']['video']['comments']['edges'][x]['node']['message']['fragments'][y]['text']
+                            if info['data']['video']['comments']['edges'][x]['node']['commenter'] == None:
+                                username = "DELETED_USER"
+                            else:
+                                username = info['data']['video']['comments']['edges'][x]['node']['commenter']['displayName']
+                            string = u"[{}] {}: {} \n".format(info['data']['video']['comments']['edges'][x]['node']['createdAt'], username, message)
+                            memefile.write(string)
+                else:
+                    logger.error("HTTP error.")
+        logger.info("Done!")
 
 class vodthread(threading.Thread):
     def __init__(self, username, quality, refreshtime, twitch_id, twitch_oauth, gspread_client, gsheets_url):

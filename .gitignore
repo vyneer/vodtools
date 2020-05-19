@@ -141,3 +141,5 @@ meme.py
 *.db
 *.db-journal
 *.log
+/chatlogs
+/muted playlists
