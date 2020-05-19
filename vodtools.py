@@ -33,14 +33,18 @@ consoleHandler.setFormatter(logformat)
 logger.addHandler(consoleHandler)
 
 # stolen from https://www.scrygroup.com/tutorial/2018-02-06/python-excepthook-logging/
-def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
+def handle_unhandled_exception(exc_type, exc_value, exc_traceback, thread_identifier=''):
     """Handler for unhandled exceptions that will write to the logs"""
     if issubclass(exc_type, KeyboardInterrupt):
         # call the default excepthook saved at __excepthook__
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
-    logger.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
 
+    if not thread_identifier:
+        logger.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
+    else:
+        logger.critical("Unhandled exception (on thread %s)", thread_identifier, exc_info=(exc_type, exc_value, exc_traceback))
+        
 sys.excepthook = handle_unhandled_exception
 
 def patch_threading_excepthook():
@@ -513,30 +517,17 @@ class launcher():
             self.threads.append(thread)
             i+=1
             thread.start()
-            time.sleep(2)
         while True:
             time.sleep(1)
-            for t in self.threads:
-                if t.is_alive() != True:
-                    match = re.findall(r"^\d+", t.name)
-                    n_in_list = int(match[0]) - 1
-                    if stream_list['list'][n_in_list]['gsheets']:
-                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], stream_list['client_id'], oauth_token, client, stream_list['list'][n_in_list]['gsheets'])
-                    else:
-                        thread = vodthread(stream_list['list'][n_in_list]['username'], stream_list['list'][n_in_list]['quality'], stream_list['list'][n_in_list]['refreshtime'], stream_list['client_id'], oauth_token, None, None)
-                    thread.daemon = True
-                    thread.name = t.name
-                    self.threads.append(thread)
-                    logger.error("Thread "+t.name+" has crashed unexpectedly. Relaunching.")
-                    thread.start()
                     
 def main(argv):
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--genmuted", "-gm", help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
+    group.add_argument("--genmuted", "-gm", metavar=('m3u8_url'), help="Generates an m3u8 playlist, replacing links to dead .ts files with their muted counterparts. Useful for subonly vods.", type=str)
     group.add_argument("--crawl", "-c", help="Fetches vods every couple of seconds from a list of streamers and pastes them into a google spreadsheet.", action="store_true")
-    group.add_argument("--single", "-s", help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
-    group.add_argument("--makesheet", "-ms", nargs=2, metavar=('SHEET_NAME','SHARE_EMAIL'), help="Creates and shares a spreadsheet.", type=str)
+    group.add_argument("--single", "-s", metavar=('user_name'), help="Fetches vods once for a specific streamer and pastes them into a textfile.", type=str)
+    group.add_argument("--chat", "-ch", metavar=('vod_url'), help="Downloads chat from a vod and pastes it into a textfile.", type=str)
+    group.add_argument("--makesheet", "-ms", nargs=2, metavar=('sheet_name','share_email'), help="Creates and shares a spreadsheet.", type=str)
     parser.add_argument("--verbose", "-v", help="Changes logging to verbose.", action="store_true")
     if len(sys.argv) == 1:
         parser.print_help()
@@ -551,7 +542,7 @@ def main(argv):
             consoleHandler.setLevel(logging.INFO)
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
-        logger.info("Launching makesheet mode.")
+        logger.info("====================== Launching makesheet mode. ======================")
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
         if pathlib.Path("client_secret.json").exists():
             creds = ServiceAccountCredentials.from_json_keyfile_name("client_secret.json", scope)
@@ -570,7 +561,7 @@ def main(argv):
             consoleHandler.setLevel(logging.INFO)
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
-        logger.info("Launching crawl mode.")
+        logger.info("====================== Launching crawl mode. ======================")
         twitch_launcher = launcher()
         twitch_launcher.run()
     if args.single:
@@ -582,8 +573,20 @@ def main(argv):
             consoleHandler.setLevel(logging.INFO)
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
-        logger.info("Launching single mode.")
+        logger.info("====================== Launching single mode. ======================")
         twitch_launcher = gensingle(args.single)
+        twitch_launcher.run()
+    if args.chat:
+        if args.verbose:
+            consoleHandler.setLevel(logging.DEBUG)
+            fileHandler.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
+        else:
+            consoleHandler.setLevel(logging.INFO)
+            fileHandler.setLevel(logging.INFO)
+            logger.setLevel(logging.INFO)
+        logger.info("====================== Launching chat download mode. ======================")
+        twitch_launcher = downchat(args.chat)
         twitch_launcher.run()
     if args.genmuted:
         if args.verbose:
@@ -594,7 +597,7 @@ def main(argv):
             consoleHandler.setLevel(logging.INFO)
             fileHandler.setLevel(logging.INFO)
             logger.setLevel(logging.INFO)
-        logger.info("Launching genmuted mode.")
+        logger.info("====================== Launching genmuted mode. ======================")
         twitch_launcher = genmuted(args.genmuted)
         twitch_launcher.run()
 
