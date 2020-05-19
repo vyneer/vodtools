@@ -19,6 +19,8 @@ import m3u8
 import re
 import logging
 
+twitch_oauth_token = ""
+
 logger = logging.getLogger(__name__)
 logformat = logging.Formatter('[%(levelname)s][%(threadName)s][%(asctime)s] %(message)s')
 
@@ -64,39 +66,39 @@ patch_threading_excepthook()
 class ttvfunctions():
     def get_token(self):
         with open("settings.json") as f1:
-            with open("twitch_oauth.json", "w") as f2:
-                settings = json.load(f1)
-                url = "https://id.twitch.tv/oauth2/token?client_id=" + settings['client_id'] + "&client_secret=" + settings['client_secret'] + "&grant_type=client_credentials"
-                info = None
-                try:
-                    time.sleep(0.01)
-                    r = requests.post(url, timeout = 15)
-                    r.raise_for_status()
-                    info = r.json()
-                    f2.write(json.dumps(info))
-                    return info['expires_in'], info['access_token']
-                except requests.exceptions.RequestException as e:
-                    logger.debug("Error in get_token: " + str(e))
+            settings = json.load(f1)
+            global twitch_oauth_token
+            url = "https://id.twitch.tv/oauth2/token?client_id=" + settings['client_id'] + "&client_secret=" + settings['client_secret'] + "&grant_type=client_credentials"
+            info = None
+            try:
+                time.sleep(0.01)
+                r = requests.post(url, timeout = 15)
+                r.raise_for_status()
+                info = r.json()
+                twitch_oauth_token = info
+                return info['expires_in'], info['access_token']
+            except requests.exceptions.RequestException as e:
+                logger.error("Error in get_token: " + str(e))
+                return 0, 0
 
     def validate_token(self):
-        if pathlib.Path("twitch_oauth.json").exists():
-            with open("twitch_oauth.json") as f:
-                twitch_oauth = json.load(f)
-                url = "https://id.twitch.tv/oauth2/validate"
-                info = None
-                try:
-                    time.sleep(0.01)
-                    r = requests.get(url, headers = {"Authorization" : "OAuth " + twitch_oauth['access_token']}, timeout = 15)
-                    r.raise_for_status()
-                    info = r.json()
-                    if r.status_code == 200:
-                        return info['expires_in'], twitch_oauth['access_token']
-                    else:
-                        return 0, 0
-                except requests.exceptions.RequestException as e:
-                    logger.debug("Error in validate_token: " + str(e))
+        if twitch_oauth_token != "":
+            url = "https://id.twitch.tv/oauth2/validate"
+            info = None
+            try:
+                time.sleep(0.01)
+                r = requests.get(url, headers = {"Authorization" : "OAuth " + twitch_oauth_token['access_token']}, timeout = 15)
+                r.raise_for_status()
+                info = r.json()
+                if r.status_code == 200 and info != None:
+                    return info['expires_in'], twitch_oauth_token['access_token']
+                else:
+                    return 0, 0
+            except Exception as e:
+                logger.error("Error in validate_token: " + str(e))
+                return 0, 0
         else:
-            logger.debug("No twitch_oauth.json found, running get_token to create one.")
+            logger.error("No twitch_oauth_token found, running get_token to create one.")
             __, oauth_token = self.get_token()
             return __, oauth_token
 
@@ -149,7 +151,7 @@ class ttvfunctions():
 
     def get_id(self, username, client_id):
         __, oauth_token = self.validate_token()
-        if (__, oauth_token) == (0, 0):
+        if __ == 0 and oauth_token == 0:
             __, oauth_token = self.get_token()
         url = 'https://api.twitch.tv/helix/users?login=' + username
         info = None
@@ -168,12 +170,10 @@ class ttvfunctions():
 
     def check_videos(self, user_id, client_id):
         __, oauth_token = self.validate_token()
-        if (__, oauth_token) == (0, 0):
+        if __ == 0 and oauth_token == 0:
             __, oauth_token = self.get_token()
-        # 0: online, 
-        # 1: offline, 
-        # 2: not found, 
-        # 3: error
+        # 0: ok, 
+        # 1: exception
         url = 'https://api.twitch.tv/helix/videos?user_id=' + user_id + "&first=100"
         info = None
         try:
@@ -189,7 +189,7 @@ class ttvfunctions():
 
     def get_m3u8(self, info, count, quality, client_id):
         secreturl = ttvfunctions().find_anipreview(info['data'][count]['id'], client_id)
-        if secreturl != "" or None:
+        if secreturl != "" and secreturl != None:
             if quality != "chunked":
                 fullurl = "https://vod-secure.twitch.tv/" + secreturl + "/" + quality + "/index-dvr.m3u8"
                 if requests.head(fullurl).status_code == 403:
@@ -365,6 +365,8 @@ class vodthread(threading.Thread):
             logger.error("GSpread error: APIError. Code: " + str(e))
         except gspread.exceptions.GSpreadException as e:
             logger.error("GSpread error: GSpreadException. Code: " + str(e))
+        except requests.exceptions.ReadTimeout as e:
+            logger.error("Requests error: ReadTimeout. Code: " + str(e))
 
     def vodcheckerLocal(self):
         try:
@@ -422,19 +424,19 @@ class vodthread(threading.Thread):
                 if banned_bool == False:
                     logger.error("No ID found: check if " + self.username + " got banned.")
                 banned_bool = True
-                time.sleep(self.refresh)
+                time.sleep(int(self.refresh))
             else:
                 banned_bool = False
                 status = ttvfunctions().check_online(self.user_id, self.client_id)
                 if status == 2:
                     logger.error("Username not found. Invalid username or typo.")
-                    time.sleep(self.refresh)
+                    time.sleep(int(self.refresh))
                 elif status == 3:
                     logger.error("Unexpected error.")
-                    time.sleep(self.refresh)
+                    time.sleep(int(self.refresh))
                 elif status == 1:
                     logger.debug(str(self.username) + " currently offline, checking again in " + str(self.refresh) + " seconds.")
-                    time.sleep(self.refresh)
+                    time.sleep(int(self.refresh))
                 elif status == 0:
                     logger.debug(str(self.username)+" online. Fetching VODs.")
                     
@@ -446,7 +448,7 @@ class vodthread(threading.Thread):
                         self.vodcheckerLocal()
 
                     #print("["+datetime.datetime.now().strftime("%Y-%m-%d %Hh%Mm%Ss")+"] "+"Done fetching.")
-                    time.sleep(self.refresh)
+                    time.sleep(int(self.refresh))
 
 class launcher():
     def __init__(self):
@@ -457,14 +459,8 @@ class launcher():
         with open("settings.json") as f:
             stream_list = json.load(f)
         i=0
-        if pathlib.Path("twitch_oauth.json").exists():
-            __, oauth_token = ttvfunctions().validate_token()
-            if (__, oauth_token) == (0, 0):
-                ttvfunctions().get_token()
-                __, oauth_token = ttvfunctions().validate_token()
-        else:
-            ttvfunctions().get_token()
-            __, oauth_token = ttvfunctions().validate_token()
+        ttvfunctions().get_token()
+        __, oauth_token = ttvfunctions().validate_token()
         for stream in stream_list['list']:
             if stream['gsheets'] != "":
                 i+=1
