@@ -474,7 +474,12 @@ class vodthread(threading.Thread):
             status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
             self.client.login()
             if status == 0:
-                if info != None and info['data'] != [] and str(info['data'][0]['url']) not in url_col:
+                if info != None and info['data'] != []:
+                    for x in range(len(info['data'])):
+                        if info['data'][x]['type'] == 'archive':
+                            first_vod = info['data'][x]['url']
+                            break
+                if info != None and info['data'] != [] and str(first_vod) not in url_col:
                     buffer_url = []
                     buffer_val = []
                     for x in range(0, len(info['data']), 1):
@@ -521,7 +526,11 @@ class vodthread(threading.Thread):
             if status == 0:
                 if info != None and info['data'] != []:
                     sql_cmd = '''SELECT * FROM {} WHERE twitchurl=?'''.format(self.username)
-                    cursor.execute(sql_cmd, (info['data'][0]['url'],))
+                    for x in range(len(info['data'])):
+                        if info['data'][x]['type'] == 'archive':
+                            first_vod = info['data'][x]['url']
+                            break
+                    cursor.execute(sql_cmd, (first_vod,))
                     if cursor.fetchone() is None:
                         for x in range(len(info['data'])-1, -1, -1):
                             fullurl, values = ttvfunctions().get_m3u8(info, x, self.quality, self.client_id)
@@ -544,7 +553,7 @@ class vodthread(threading.Thread):
             else:
                 logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
         except TypeError as e:
-            logger.error("Caugth a TypeError in vodthread: " + str(e))
+            logger.error("Caught a TypeError in vodthread: " + str(e))
 
     def loopcheck(self):
         banned_bool = False
