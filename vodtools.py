@@ -214,7 +214,7 @@ class ttvfunctions():
         info = None
         try:
             time.sleep(0.01)
-            r = requests.get(url, headers = {"Client-ID" : "kimne78kx3ncx6brgo4mv6wki5h1ko"}, timeout = 15)
+            r = requests.get(url, headers = {"Client-ID" : "kimne78kx3ncx6brgo4mv6wki5h1ko", "Accept" : "application/vnd.twitchtv.v5+json"}, timeout = 15)
             r.raise_for_status()
             info = r.json()
             if info['animated_preview_url'] != [] or None:
