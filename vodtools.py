@@ -184,6 +184,8 @@ class ttvfunctions():
         __, oauth_token = self.validate_token()
         if __ == 0 and oauth_token == 0:
             __, oauth_token = self.get_token()
+        if __ == 0 and oauth_token == 0:
+            return 3
         # 0: online, 
         # 1: offline, 
         # 2: not found, 
@@ -230,6 +232,8 @@ class ttvfunctions():
         __, oauth_token = self.validate_token()
         if __ == 0 and oauth_token == 0:
             __, oauth_token = self.get_token()
+        if __ == 0 and oauth_token == 0:
+            return None
         url = 'https://api.twitch.tv/helix/users?login=' + username
         info = None
         try:
@@ -238,8 +242,8 @@ class ttvfunctions():
             r.raise_for_status()
             info = r.json()
             if info['data'] != [] or None:
-                    logger.debug("Got userid from username - "+info["data"][0]["id"])
-                    return info["data"][0]["id"]
+                logger.debug("Got userid from username - "+info["data"][0]["id"])
+                return info["data"][0]["id"]
             else:
                 return None
         except requests.exceptions.RequestException as e:
@@ -249,6 +253,8 @@ class ttvfunctions():
         __, oauth_token = self.validate_token()
         if __ == 0 and oauth_token == 0:
             __, oauth_token = self.get_token()
+        if __ == 0 and oauth_token == 0:
+            return 1, None
         # 0: ok, 
         # 1: exception
         url = 'https://api.twitch.tv/helix/videos?user_id=' + user_id + "&first=100"
