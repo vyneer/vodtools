@@ -257,7 +257,7 @@ class ttvfunctions():
             return 1, None
         # 0: ok, 
         # 1: exception
-        url = 'https://api.twitch.tv/helix/videos?user_id=' + user_id + "&first=100"
+        url = 'https://api.twitch.tv/helix/videos?user_id=' + user_id + "&first=100&type=archive"
         info = None
         try:
             time.sleep(0.01)
