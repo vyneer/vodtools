@@ -26,9 +26,7 @@ requires OAuth for all their Helix API calls. Here's how you can get one:
 
 3. Select "Manage" next to your app on the next page.
 
-4. Copy your Client ID and paste it both into your settings.json and into this URL - https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=CLIENTID&redirect_uri=http://localhost&scope= (replace the CLIENTID, of course).
-
-5. Open the URL, login. In your address bar there should be a URL with your access (OAuth) token.
+4. Copy your Client ID and paste it into your settings.json.
 
 ## Google Sheets API / client_secret.json
 
