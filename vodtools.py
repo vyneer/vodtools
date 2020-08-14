@@ -562,6 +562,8 @@ class vodthread(threading.Thread):
                 logger.error("HTTP error, trying again in " + str(self.refresh) + " seconds.")
         except TypeError as e:
             logger.error("Caught a TypeError in vodthread: " + str(e))
+        except sqlite3.OperationalError as e:
+            logger.error("SQLite error: OperationalError. Code: " + str(e))
 
     def loopcheck(self):
         banned_bool = False
