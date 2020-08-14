@@ -143,3 +143,5 @@ meme.py
 *.log
 /chatlogs
 /muted playlists
+/data
+*.txt

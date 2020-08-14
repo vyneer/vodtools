@@ -32,6 +32,12 @@ consoleHandler = logging.StreamHandler(sys.stdout)
 consoleHandler.setFormatter(logformat)
 logger.addHandler(consoleHandler)
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+rel_path = "data"
+data_path = os.path.join(script_dir, rel_path)
+if os.path.exists(data_path) == False:
+    os.mkdir(data_path)
+
 # stolen from https://www.scrygroup.com/tutorial/2018-02-06/python-excepthook-logging/
 def handle_unhandled_exception(exc_type, exc_value, exc_traceback, thread_identifier=''):
     """Handler for unhandled exceptions that will write to the logs"""
@@ -298,12 +304,15 @@ class gensingle():
         self.username = username
         self.user_id = None
         self.user_id = ttvfunctions().get_id(self.username, self.client_id)
+        self.path = os.path.join(data_path, "single textfiles")
+        if os.path.exists(self.path) == False:
+            os.mkdir(self.path)
 
     def run(self):
         status, info = ttvfunctions().check_videos(self.user_id, self.client_id)
         if info != None and info['data'] != []:
             if status == 0:
-                with open(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt", "wb") as memefile:
+                with open(os.path.join(self.path, datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")+"_"+self.username + ".txt"), "wb") as memefile:
                     for x in range(len(info['data'])-1, -1, -1):
                         fullurl, values = ttvfunctions().get_m3u8(info, x, "chunked", self.client_id)
                         if fullurl != None and fullurl != "notarchive":
@@ -331,7 +340,6 @@ class sheetmaker():
 class genmuted():
     def __init__(self, url):
         self.url=url
-        self.script_dir = os.path.dirname(os.path.abspath(__file__))
 
     def loadM3u8(self, m3u8url):
         def load_m3u8(url):
@@ -353,19 +361,19 @@ class genmuted():
         regex1 = re.findall(r"(?<=\/)[^\/]+(?=\/)", clean_url)
 
         rel_path = "muted playlists"
-        abs_file_path = os.path.join(self.script_dir, rel_path)
+        abs_file_path = os.path.join(data_path, rel_path)
         orig_rel_path = "muted playlists\\" + regex1[1] + ".m3u8"
-        orig_abs_file_path = os.path.join(self.script_dir, orig_rel_path)
+        orig_abs_file_path = os.path.join(data_path, orig_rel_path)
         buf_rel_path = "muted playlists\\buffer.txt"
-        buf_abs_file_path = os.path.join(self.script_dir, buf_rel_path)
+        buf_abs_file_path = os.path.join(data_path, buf_rel_path)
         mut_rel_path = "muted playlists\\muted_" + regex1[1] + ".m3u8"
-        mut_abs_file_path = os.path.join(self.script_dir, mut_rel_path)
+        mut_abs_file_path = os.path.join(data_path, mut_rel_path)
 
         r = requests.get(self.url, stream=True)
         if os.path.exists(abs_file_path) == False:
             os.mkdir(abs_file_path)
         open(orig_abs_file_path, "wb").write(r.content)
-        logger.info("Downloaded the original/broken m3u8 to /muted playlists/" + regex1[1] + ".m3u8.")
+        logger.info("Downloaded the original/broken m3u8 to /data/muted playlists/" + regex1[1] + ".m3u8.")
 
         tslinks = self.loadM3u8(self.url)
         i=0
@@ -401,11 +409,10 @@ class downchat():
     def __init__(self, url):      
         # user configuration
         self.vodurl = url
-        self.script_dir = os.path.dirname(os.path.abspath(__file__))
 
     def run(self):
         rel_path = "chatlogs"
-        abs_file_path = os.path.join(self.script_dir, rel_path)
+        abs_file_path = os.path.join(data_path, rel_path)
 
         if os.path.exists(abs_file_path) == False:
             os.mkdir(abs_file_path)
@@ -415,7 +422,7 @@ class downchat():
         logger.info("Getting chat from VOD number - " + vod_id + ".")
         status, info = ttvfunctions().get_chat(vod_id, cursor)
         txt_rel_path = "chatlogs\\" + vod_id + "_chat.txt"
-        txt_abs_file_path = os.path.join(self.script_dir, txt_rel_path)
+        txt_abs_file_path = os.path.join(data_path, txt_rel_path)
         if info != None and info['data']['video'] != [] and info['data']['video'] != None and info['data']['video']['comments']['edges'] != [] and info['data']['video']['comments']['edges'] != None:
             if status == 0:
                 with open(txt_abs_file_path, "w", encoding='utf-8') as memefile:
@@ -468,6 +475,7 @@ class vodthread(threading.Thread):
         self.gsheets_url = gsheets_url
         self.client = gspread_client
         self.old_status = 0
+        self.path = os.path.join(data_path, "voddb.db")
 
     def run(self):
         self.loopcheck()
@@ -517,13 +525,12 @@ class vodthread(threading.Thread):
 
     def vodcheckerLocal(self):
         try:
-            path = pathlib.Path("voddb.db")
-            if path.exists() != True:
-                conn = sqlite3.connect("voddb.db")
+            if os.path.exists(self.path) == False:
+                conn = sqlite3.connect(self.path)
                 cursor=conn.cursor()
                 sql_cmd = '''CREATE TABLE {} (timecode text, title text, twitchurl text, vodurl text, type text)'''.format(self.username)
                 cursor.execute(sql_cmd)
-            conn = sqlite3.connect("voddb.db")
+            conn = sqlite3.connect(self.path)
             cursor=conn.cursor()
             sql_cmd = ''' SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{}' '''.format(self.username)
             cursor.execute(sql_cmd)
