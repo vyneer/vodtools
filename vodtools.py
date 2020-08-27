@@ -18,6 +18,7 @@ import argparse
 import m3u8
 import re
 import logging
+import socket
 
 twitch_oauth_token = ""
 
@@ -520,8 +521,12 @@ class vodthread(threading.Thread):
             logger.error("GSpread error: GSpreadException. Code: " + str(e))
         except requests.exceptions.ReadTimeout as e:
             logger.error("Requests error: ReadTimeout. Code: " + str(e))
+        except requests.exceptions.ConnectionError as e:
+            logger.error("Requests error: ConnectionError. Code: " + str(e))
         except ConnectionResetError as e:
             logger.error("GSpread error: ConnectionResetError. Code: " + str(e))
+        except socket.timeout as e:
+            logger.error("Requests error: socket.timeout. Code: " + str(e))
 
     def vodcheckerLocal(self):
         try:
